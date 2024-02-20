@@ -163,6 +163,31 @@
         </div>
       </el-card>
     </div>
+    <el-dialog
+      title="转交工单"
+      :visible.sync="dialogVisible"
+      width="30%"
+    >
+      <el-form ref="ruleForm_2" :model="ruleForm_2" :rules="rules" label-width="60px" class="demo-ruleForm">
+        <el-form-item label="节点" prop="node_id">
+          <el-select v-model="ruleForm_2.node_id" placeholder="选择节点" size="small" style="width: 100%">
+            <el-option v-for="(item, index) in nodeList" :key="index" :label="item.label" :value="item.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="用户" prop="user_id">
+          <el-select v-model="ruleForm_2.user_id" filterable placeholder="选择用户" size="small" style="width: 100%">
+            <el-option v-for="(item, index) in users" :key="index" :label="item.nickName" :value="item.userId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="ruleForm_2.remarks" type="textarea" size="small" />
+        </el-form-item>
+        <el-form-item style="text-align: right">
+          <el-button type="primary" @click="submitForm('ruleForm_2')">提交</el-button>
+          <el-button @click="dialogVisible = false">关闭</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
   </div>
 </template>
 
@@ -177,7 +202,9 @@ Vue.component(GenerateForm.name, GenerateForm)
 import {
   processStructure,
   handleWorkOrder,
-  activeOrder
+  activeOrder,
+  workOrderList,
+  inversionWorkOrder
 } from '@/api/process/work-order'
 
 import { listUser } from '@/api/system/sysuser'
@@ -187,6 +214,12 @@ import { getDeptList } from '@/api/system/dept'
 export default {
   data() {
     return {
+      listQuery: {},
+      queryParams: {},
+      ticketList: [],
+      nodeList: [],
+      users: [],
+      dialogVisible: false,
       isLoadingStatus: true,
       currentNode: {
         hideTpls: null,
@@ -214,6 +247,20 @@ export default {
         tpls: [],
         tasks: []
       },
+      ruleForm_2: {
+        work_order_id: '',
+        node_id: '',
+        user_id: '',
+        remarks: ''
+      },
+      rules: {
+        node_id: [
+          { required: true, message: '请选择节点', trigger: 'change' }
+        ],
+        user_id: [
+          { required: true, message: '请选择用户', trigger: 'change' }
+        ]
+      },
       remoteFunc: {
         // 获取用户列表
         async userList(resolve) {
@@ -239,11 +286,31 @@ export default {
     this.getProcessNodeList()
   },
   methods: {
+    getList() {
+      this.loading = true
+      this.listQuery.page = 1
+      this.listQuery.per_page = 100000
+      this.listQuery.classify = 4
+      workOrderList(this.listQuery).then(response => {
+        this.ticketList = response.data.data
+        this.queryParams.pageIndex = response.data.page
+        this.queryParams.pageSize = response.data.per_page
+        this.total = response.data.total_count
+        this.loading = false
+        this.ticketList.forEach(element => {
+          if (element.id === this.ruleForm_2.work_order_id) {
+            this.ruleForm_2.node_id = element.state[0].id
+          }
+        })
+        console.log('test workOrderList ', this.ticketList)
+      })
+    },
     getProcessNodeList() {
       processStructure({
         processId: this.$route.query.processId,
         workOrderId: this.$route.query.workOrderId
       }).then(response => {
+        this.ruleForm_2.work_order_id = this.$route.query.workOrderId
         this.isActiveProcessing = false
         this.processStructureValue = response.data
         this.circulationHistoryList = this.processStructureValue.circulationHistory
@@ -312,10 +379,47 @@ export default {
         }).then(response => {
           if (response.code === 200) {
           // this.$router.push({ name: 'upcoming' })
-          // window.location.reload()
+            // window.location.reload()
+            this.getList()
+            if (this.checkForEnd(item.target)) {
+              this.dialogVisible = false
+            } else {
+              this.handleInversion()
+              this.dialogVisible = true
+            }
             this.getProcessNodeList()
           }
         })
+      })
+    },
+    handleInversion() {
+      listUser({
+        pageSize: 999999
+      }).then(response => {
+        this.users = response.data.list
+      })
+    },
+    checkForEnd(str1) {
+      // 将字符串转换为小写，以避免大小写敏感性
+      str1 = str1.toLowerCase()
+      // 使用 indexOf() 方法检查字符串中是否包含 'end'
+      if (str1.indexOf('end') !== -1) {
+        return true
+      } else {
+        return false
+      }
+    },
+    submitForm(formName) {
+      console.log('this.ruleFormx ', this.ruleForm_2)
+      this.$refs[formName].validate((valid) => {
+        if (valid) {
+          inversionWorkOrder(this.ruleForm_2).then(response => {
+            if (response.code === 200) {
+              this.getList()
+              this.dialogVisible = false
+            }
+          })
+        }
       })
     },
     // 获取提示消息

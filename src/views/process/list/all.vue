@@ -172,6 +172,7 @@ export default {
         this.queryParams.pageSize = response.data.per_page
         this.total = response.data.total_count
         this.loading = false
+        console.log('form: ', response.data.data)
       })
     },
     handleSearch(val) {
@@ -238,6 +239,7 @@ export default {
     },
     handleSelectionChange() {},
     submitForm(formName) {
+      console.log('this.ruleForm ', this.ruleForm)
       this.$refs[formName].validate((valid) => {
         if (valid) {
           inversionWorkOrder(this.ruleForm).then(response => {

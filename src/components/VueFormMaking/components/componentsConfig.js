@@ -420,7 +420,7 @@ export const advanceComponents = [
       headers: {},
       // isQiniu: false,
       tip: '', // 提示说明
-      action: 'http://192.168.1.103:8002/api/v1/public/uploadFile',
+      action: 'http://order.cdqrmi.com:8002/api/v1/public/uploadFile',
       labelWidth: 100,
       labelWidthDisabled: false,
       labelWidthStatus: true,

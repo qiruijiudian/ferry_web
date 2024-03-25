@@ -28,7 +28,8 @@
         <div v-if="!disabled" class="uplaod-action" :style="{height: miniWidth / 4 + 'px'}">
           <i class="iconfont icon-tupianyulan" :title="$t('fm.upload.preview')" :style="{'font-size': miniWidth/8+'px'}" @click="handlePreviewFile(item.key)" />
           <i v-if="isEdit" class="iconfont icon-sync1" :title="$t('fm.upload.edit')" :style="{'font-size': miniWidth/8+'px'}" @click="handleEdit(item.key)" />
-          <i v-if="isDelete && fileList.length > min" class="iconfont icon-delete" :title="$t('fm.upload.delete')" :style="{'font-size': miniWidth/8+'px'}" @click="handleRemove(item.key)" />
+          <!-- <i v-if="isDelete && fileList.length > min" class="iconfont icon-delete" :title="$t('fm.upload.delete')" :style="{'font-size': miniWidth/8+'px'}" @click="handleRemove(item.key)" /> -->
+          <i v-if="true" class="iconfont icon-delete" :title="$t('fm.upload.delete')" :style="{'font-size': miniWidth/8+'px'}" @click="handleRemove(item.key)" />
         </div>
       </div>
     </draggable>

@@ -26,6 +26,13 @@ export function workOrderList(params) {
     params
   })
 }
+export function sendSMS(params) {
+  return request({
+    url: '/api/v1/public/send_sms',
+    method: 'post',
+    data: params
+  })
+}
 
 // 处理工单
 export function handleWorkOrder(data) {

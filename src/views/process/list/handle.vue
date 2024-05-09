@@ -166,7 +166,7 @@
     <el-dialog
       title="转交工单"
       :visible.sync="dialogVisible"
-      width="30%"
+      class="dialog_pc_m"
     >
       <el-form ref="ruleForm_2" :model="ruleForm_2" :rules="rules" label-width="60px" class="demo-ruleForm">
         <el-form-item label="节点" prop="node_id">
@@ -442,3 +442,14 @@ export default {
   }
 }
 </script>
+<style scoped>
+  .dialog_pc_m :deep(.el-dialog){
+    width: 30%;
+  }
+  /* 针对窄屏设备（如手机） */
+  @media (max-width: 767px) {
+    .dialog_pc_m :deep(.el-dialog){
+      width: 70%;
+    }
+  }
+</style>

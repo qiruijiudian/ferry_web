@@ -19,10 +19,18 @@ $--border-color-lighter: #e6ebf5;
 
 $--table-border:1px solid#dfe6ec;
 
+// 消息框的宽度，可以根据需要设置为百分比或者使用媒体查询实现响应式
+
+
+
 /* icon font path, required */
 $--font-path: '~element-ui/lib/theme-chalk/fonts';
 
 @import "~element-ui/packages/theme-chalk/src/index";
+
+.el-message-box {
+  width: auto !important;
+}
 
 // the :export directive is the magic sauce for webpack
 // https://www.bluematador.com/blog/how-to-share-variables-between-js-and-sass

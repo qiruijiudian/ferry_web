@@ -22,7 +22,7 @@
           <div class="workflow-classify-title">
             {{ item.name }}
           </div>
-          <div style="margin-bottom: 15px;">
+          <div style="margin-bottom: 15px;" class="workflow-classify-div-list">
             <template v-for="(buttonItem, buttonIndex) in item.process_list">
               <el-tooltip :key="buttonItem.id" effect="dark" placement="top">
                 <div slot="content">
@@ -35,8 +35,8 @@
                   :style="(buttonIndex + 1) % 5 === 0 ? {'padding-right': 0} : {'padding-right': '12px'}"
                 >
                   <el-button
-                    style="width: 100%"
                     plain
+                    class="process-button"
                     @click="submitWorkOrder(buttonItem.id)"
                   >
                     <div class="process-button-div">
@@ -98,6 +98,13 @@ export default {
     border-left: 3px solid rgb(64, 158, 255);
     padding-left: 5px;
   }
+  .workflow-classify-div-list{
+    display: flex;
+    .process-button
+    {
+      width: 100%;
+    }
+  }
 
   .workflow-classify-div {
     width: 20%;
@@ -154,4 +161,16 @@ export default {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* 针对窄屏设备（如手机） */
+  @media (max-width: 767px) {
+    .workflow-classify-div-list{
+      display: inline-grid;
+
+      .process-button{
+        width: auto;
+      }
+
+    }
+  }
+
 </style>

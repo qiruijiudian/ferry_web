@@ -145,7 +145,7 @@
             />
             <el-table-column
               prop="circulation"
-              label="流转"
+              label="流转记录"
             />
             <el-table-column
               prop="processor"
@@ -385,7 +385,7 @@ export default {
               this.dialogVisible = false
             } else {
               this.handleInversion()
-              this.dialogVisible = true
+              // this.dialogVisible = true
             }
             this.getProcessNodeList()
           }

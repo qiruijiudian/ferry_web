@@ -400,7 +400,6 @@ export default {
           method: this.widget.options.requestMethod.method,
           headers: headers
         }
-
         if (this.widget.options.requestMethod.method === 'get') {
           axiosParams["params"] = params
         } else if (this.widget.options.requestMethod.method === 'post') {
@@ -414,11 +413,11 @@ export default {
           } else {
             fields = ["data"]
           }
-
-          let result = resp.data
+          let result = resp.data.data
           for (let f of fields) {
             result = result[f]
           }
+          console.log("remoteOptions ",result)
           this.widget.options.remoteOptions = result.map(item => {
             return {
               value: item[this.widget.options.props.value],

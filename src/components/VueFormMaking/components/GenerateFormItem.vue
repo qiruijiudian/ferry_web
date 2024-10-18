@@ -330,6 +330,7 @@
 import FmUpload from './Upload'
 import FileUpload from './Upload/file'
 import axios from 'axios'
+import { getToken } from '@/utils/auth'
 
 export default {
   name: 'GenetateFormItem',
@@ -392,7 +393,7 @@ export default {
       if (this.widget.options.remote === 99) {
         let headers = JSON.parse(this.widget.options.requestMethod.headers)
         headers["content-type"] = "application/json; charset=utf-8"
-
+        headers["Authorization"] = "Bearer " + getToken()
         let params = JSON.parse(this.widget.options.requestMethod.params)
 
         let axiosParams = {
@@ -417,7 +418,6 @@ export default {
           for (let f of fields) {
             result = result[f]
           }
-          console.log("remoteOptions ",result)
           this.widget.options.remoteOptions = result.map(item => {
             return {
               value: item[this.widget.options.props.value],

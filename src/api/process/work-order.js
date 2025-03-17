@@ -26,6 +26,14 @@ export function workOrderList(params) {
     params
   })
 }
+// 项目列表
+export function projectList(params) {
+  return request({
+    url: '/api/v1/work-order/projectlist',
+    method: 'get',
+    params
+  })
+}
 export function sendSMS(params) {
   return request({
     url: '/api/v1/public/send_sms',

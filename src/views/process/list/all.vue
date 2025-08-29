@@ -19,7 +19,8 @@
         </el-table-column>
         <el-table-column label="当前处理人" :show-overflow-tooltip="true">
           <template slot-scope="scope">
-            <span v-if="scope.row.is_end===0">{{ scope.row.principals }}</span>
+            <!-- <span v-if="scope.row.is_end===0">{{ scope.row.principals }}</span> -->
+            <span v-if="scope.row">{{ scope.row.principals }}</span>
           </template>
         </el-table-column>
         <el-table-column label="优先级" :show-overflow-tooltip="true" width="120" align="left">

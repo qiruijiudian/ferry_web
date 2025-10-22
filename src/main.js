@@ -30,7 +30,6 @@ Vue.use(VueParticles)
 
 // 代码编辑器
 import VueCodeMirror from 'vue-codemirror'
-import 'codemirror/lib/codemirror.css'
 Vue.use(VueCodeMirror)
 
 // 富文本编辑器

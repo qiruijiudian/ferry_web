@@ -132,8 +132,10 @@ import {
 
 // 代码编辑器
 import { codemirror } from 'vue-codemirror'
-require('codemirror/mode/python/python') // 这里引入的模式的js，根据设置的mode引入，一定要引入！！
-require('codemirror/mode/shell/shell') // 这里引入的模式的js，根据设置的mode引入，一定要引入！！
+// 导入 codemirror 6.x 的语言支持
+import { python } from '@codemirror/lang-python'
+import { javascript } from '@codemirror/lang-javascript'
+import { oneDark } from '@codemirror/theme-one-dark'
 
 export default {
   name: 'Task',
@@ -168,19 +170,20 @@ export default {
         content: ''
       },
       contentOptions: {
-        flattenSpans: false, // 默认情况下，CodeMirror会将使用相同class的两个span合并成一个。通过设置此项为false禁用此功能
-        matchBrackets: true, // 匹配符号
-        lineWiseCopyCut: true, // 如果在复制或剪切时没有选择文本，那么就会自动操作光标所在的整行
+        extensions: [python()], // 使用 extensions 替代 mode
+        flattenSpans: false,
+        matchBrackets: true,
+        lineWiseCopyCut: true,
         tabSize: 4,
         value: '',
-        mode: 'python',
-        lineNumbers: true, // 显示行号
+        lineNumbers: true,
         line: true,
-        smartIndent: true, // 智能缩进
-        autoCloseBrackets: true, // 自动输入括弧
-        foldGutter: true, // 允许在行号位置折叠
-        indentUnit: 4, // 智能缩进单位为4个空格长度
-        styleActiveLine: true // 激活当前行样式
+        smartIndent: true,
+        autoCloseBrackets: true,
+        foldGutter: true,
+        indentUnit: 4,
+        styleActiveLine: true,
+        theme: oneDark // 可选：启用暗色主题
       },
       rules: {
         name: [
@@ -202,10 +205,6 @@ export default {
         content: [
           { required: true, message: '请输入任务内容', trigger: 'blur' }
         ]
-      },
-      listQuery: {
-        page: 1,
-        per_page: 10
       }
     }
   },
@@ -213,120 +212,91 @@ export default {
     this.getList()
   },
   methods: {
-    selectTaskType() {
-      if (this.ruleForm.classify === '') {
-        this.contentOptions.mode = 'python'
-      } else {
-        this.contentOptions.mode = this.ruleForm.classify
-      }
-      this.codemirrorRefresh = false
-      this.codemirrorRefresh = true
-    },
-    /** 查询角色列表 */
     getList() {
       this.loading = true
-      this.listQuery.page = this.queryParams.pageIndex
-      this.listQuery.per_page = this.queryParams.pageSize
-      taskList(this.listQuery).then(response => {
-        this.taskList = response.data.data
-        this.queryParams.pageIndex = response.data.page
-        this.queryParams.pageSize = response.data.per_page
-        this.total = response.data.total_count
+      taskList(this.queryParams).then(response => {
+        this.taskList = response.data.list
+        this.total = response.data.total
         this.loading = false
       })
     },
-    handleQuery(val) {
-      this.listQuery.name = val.name
+    handleQuery() {
+      this.queryParams.pageIndex = 1
       this.getList()
     },
+    handleSelectionChange(selection) {
+      this.ids = selection.map(item => item.uuid)
+      this.single = selection.length !== 1
+      this.multiple = !selection.length
+    },
     handleCreate() {
+      this.dialogFormVisibleName = 1
+      this.open = true
       this.ruleForm = {
         name: '',
         classify: '',
         content: ''
       }
-      this.dialogFormVisibleName = 1
-      this.open = true
     },
     handleEdit(row) {
       this.dialogFormVisibleName = 2
-      taskDetails({
-        file_name: row.full_name
-      }).then(response => {
-        this.ruleForm = {
-          name: row.name,
-          full_name: row.full_name,
-          classify: row.classify,
-          content: response.data
-        }
-        this.open = true
-      })
-    },
-    submitForm(formName) {
-      this.ruleForm.content = this.$refs.codemirror.content
-      this.$refs[formName].validate((valid) => {
-        if (valid) {
-          createTask(this.ruleForm).then(() => {
-            this.getList()
-            this.open = false
-            this.$message({
-              message: '任务脚本创建成功',
-              type: 'success'
-            })
-          })
-        }
-      })
-    },
-    editForm(formName) {
-      this.ruleForm.content = this.$refs.codemirror.content
-      this.$refs[formName].validate((valid) => {
-        if (valid) {
-          updateTask(this.ruleForm).then(response => {
-            this.getList()
-            this.open = false
-            this.$message({
-              message: '任务脚本更新成功',
-              type: 'success'
-            })
-          })
-        }
+      this.open = true
+      taskDetails(row.uuid).then(response => {
+        this.ruleForm = response.data
       })
     },
     handleDelete(row) {
-      this.$confirm('此操作将永久删除该数据, 是否继续?', '提示', {
+      this.$confirm('此操作将永久删除该任务, 是否继续?', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        deleteTask({
-          full_name: row.full_name
-        }).then(() => {
+        deleteTask(row.uuid).then(response => {
+          this.$message.success('删除成功')
           this.getList()
-          this.$message({
-            type: 'success',
-            message: '删除成功!'
-          })
         })
       }).catch(() => {
-        this.$message({
-          type: 'info',
-          message: '已取消删除'
-        })
+        this.$message.info('已取消删除')
       })
     },
-    handleSelectionChange() {}
+    submitForm(formName) {
+      this.$refs[formName].validate((valid) => {
+        if (valid) {
+          createTask(this.ruleForm).then(response => {
+            this.$message.success('创建成功')
+            this.open = false
+            this.getList()
+          })
+        } else {
+          return false
+        }
+      })
+    },
+    editForm(formName) {
+      this.$refs[formName].validate((valid) => {
+        if (valid) {
+          updateTask(this.ruleForm).then(response => {
+            this.$message.success('修改成功')
+            this.open = false
+            this.getList()
+          })
+        } else {
+          return false
+        }
+      })
+    },
+    selectTaskType() {
+      if (this.ruleForm.classify === 'python') {
+        this.contentOptions.extensions = [python()]
+      } else if (this.ruleForm.classify === 'shell') {
+        this.contentOptions.extensions = [javascript()]
+      } else {
+        this.contentOptions.extensions = [python()]
+      }
+      this.codemirrorRefresh = false
+      this.$nextTick(() => {
+        this.codemirrorRefresh = true
+      })
+    }
   }
 }
-</script>
-
-<style scoped>
-  .codemirror {
-    line-height: 150%;
-  }
-
-  .codemirror-div {
-    border: 1px solid #DCDFE6;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-</style>

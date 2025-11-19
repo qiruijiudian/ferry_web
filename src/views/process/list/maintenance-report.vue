@@ -219,6 +219,10 @@
 </template>
 
 <script>
+// 导入项目已有的API方法，与其他页面保持一致
+import { workOrderList } from '@/api/process/work-order'
+import { processList } from '@/api/process/admin/process'
+// import { listProcess } from '@/api/process/process' // 假设流程接口路径，根据实际项目调整
 import axios from 'axios'
 
 export default {
@@ -288,7 +292,10 @@ export default {
         2: { label: '4-8小时', min: 4, max: 8 },
         3: { label: '8-24小时', min: 8, max: 24 },
         4: { label: '>24小时', min: 24, max: Infinity }
-      }
+      },
+      // 缓存两个请求的数据
+      cachedWorkOrders: null, // 缓存请求一：工单列表数据
+      cachedProcesses: null // 缓存请求二：流程列表数据
     }
   },
   computed: {
@@ -337,6 +344,9 @@ export default {
   },
   mounted() {
     console.log('MaintenanceReport组件已挂载')
+    // 页面加载时预请求并缓存两个接口数据
+    this.preFetchAndCacheData()
+    // 原有逻辑
     this.fetchReportData()
     this.loadChartJS().then(() => {
       console.log('Chart.js加载完成，开始初始化图表')
@@ -344,6 +354,97 @@ export default {
     })
   },
   methods: {
+    // 预请求并缓存两个接口数据
+    preFetchAndCacheData() {
+      // 1. 工单列表请求（仅classify=4）
+      this.fetchWorkOrders().then(data => {
+        this.cachedWorkOrders = data
+        console.log('工单列表数据已缓存', data)
+      }).catch(err => {
+        console.error('工单列表预请求失败', err)
+      })
+
+      // 2. 流程列表请求（仅per_page=999999）
+      this.fetchProcesses().then(data => {
+        this.cachedProcesses = data
+        console.log('流程列表数据已缓存', data)
+      }).catch(err => {
+        console.error('流程列表预请求失败', err)
+      })
+    },
+
+    // 请求一：获取工单列表（使用项目统一API）
+    fetchWorkOrders() {
+      return new Promise((resolve, reject) => {
+        workOrderList({
+          classify: 4 // 只传classify=4，不带per_page参数
+        }).then(response => {
+          if (response.code === 200) {
+            resolve(response.data) // 缓存工单数据
+          } else {
+            reject(new Error('工单列表请求失败: ' + response.msg))
+          }
+        }).catch(error => {
+          reject(error)
+        })
+      })
+    },
+
+    // 请求二：获取流程列表（使用项目统一API）
+    fetchProcesses() {
+      return new Promise((resolve, reject) => {
+        processList({
+          per_page: 999999 // 只传per_page=999999
+        }).then(response => {
+          if (response.code === 200) {
+            resolve(response.data)
+          } else {
+            reject(new Error('流程列表请求失败: ' + response.msg))
+          }
+        }).catch(error => {
+          reject(error)
+        })
+      })
+    },
+
+    // 从缓存中获取工单列表数据
+    getCachedWorkOrders() {
+      return this.cachedWorkOrders
+    },
+
+    // 从缓存中获取流程名称
+    getProcessName(processId) {
+      if (!this.cachedProcesses || !this.cachedProcesses.data) return '未知流程'
+      const process = this.cachedProcesses.data.find(p => p.id === processId)
+      return process ? process.name : '未知流程'
+    },
+
+    // 从缓存中筛选工单数据
+    filterCachedWorkOrders(condition = {}) {
+      if (!this.cachedWorkOrders || !this.cachedWorkOrders.data) return []
+
+      return this.cachedWorkOrders.data.filter(order => {
+        // 片区筛选
+        if (condition.area && condition.area !== 'all') {
+          const areaMap = {
+            'gangba': 'kamba',
+            'lasa': 'lhasa',
+            'cuona': 'cona',
+            'sajia': 'sayga'
+          }
+          if (order.belongs !== areaMap[condition.area]) return false
+        }
+
+        // 状态筛选
+        if (condition.status) {
+          if (condition.status === 'ended' && order.is_end !== 1) return false
+          if (condition.status === 'processing' && (order.is_end === 1 || order.is_denied === 1)) return false
+        }
+
+        return true
+      })
+    },
+
     // 获取报表数据
     fetchReportData() {
       const now = new Date()
@@ -391,7 +492,6 @@ export default {
 
     // 获取Token（与工单列表页面保持一致）
     getToken() {
-      // 关键：使用系统中工单列表页面相同的Token存储键
       return localStorage.getItem('token') || ''
     },
 
@@ -977,7 +1077,7 @@ export default {
       }
     },
 
-    // 获取时长区间工单详情
+    // 获取时长区间工单详情（优先使用缓存）
     fetchWorkOrderDetails(timeRangeIndex) {
       const timeRange = this.timeRangeMap[timeRangeIndex]
       if (!timeRange) {
@@ -988,41 +1088,53 @@ export default {
         return
       }
 
+      // 尝试从缓存获取数据
+      if (this.cachedWorkOrders && this.cachedWorkOrders.data) {
+        this.workOrderLoading = false
+        // 格式化缓存中的数据
+        this.workOrderDetailData = this.cachedWorkOrders.data.map(item => this.formatWorkOrderData(item))
+        return
+      }
+
+      // 缓存未命中时才发起请求
       this.workOrderLoading = true
       const filterParams = this.getFilterParams()
       const apiParams = {
         classify: 4,
         page: 1,
-        per_page: 10,
+        per_page: 9999,
         min_time: timeRange.min,
         max_time: timeRange.max,
         ...filterParams
       }
 
-      axios({
-        url: 'https://order.cdqrmi.com/api/v1/work-order/list',
-        method: 'get',
-        headers: {
-          'Authorization': 'Bearer ' + this.getToken()
-        },
-        params: apiParams
+      // 使用项目统一API请求工单详情
+      workOrderList(apiParams).then(response => {
+        this.workOrderLoading = false
+        if (response.code === 200) {
+          this.workOrderDetailData = response.data.data.map(item => this.formatWorkOrderData(item))
+        } else {
+          this.$message.error(`获取工单详情失败：${response.msg || '未知错误'}`)
+          this.workOrderDetailData = []
+        }
+      }).catch(error => {
+        this.handleApiError(error)
       })
-        .then(response => {
-          this.workOrderLoading = false
-          if (response.data.code === 200) {
-            this.workOrderDetailData = response.data.data.map(item => this.formatWorkOrderData(item))
-          } else {
-            this.$message.error(`获取工单详情失败：${response.data.message || '未知错误'}`)
-            this.workOrderDetailData = []
-          }
-        })
-        .catch(error => {
-          this.handleApiError(error)
-        })
     },
 
-    // 获取工单总数量详情
+    // 获取工单总数量详情（优先使用缓存）
     fetchWorkOrderTotalDetails() {
+      // 尝试从缓存获取数据
+      if (this.cachedWorkOrders && this.cachedWorkOrders.data) {
+        this.workOrderLoading = false
+        this.workOrderDialogTitle = '所有工单详情'
+        this.workOrderDialogVisible = true
+        // 格式化缓存中的数据
+        this.workOrderDetailData = this.cachedWorkOrders.data.map(item => this.formatWorkOrderData(item))
+        return
+      }
+
+      // 缓存未命中时才发起请求
       this.workOrderLoading = true
       this.workOrderDialogTitle = '所有工单详情'
       this.workOrderDialogVisible = true
@@ -1031,30 +1143,22 @@ export default {
       const apiParams = {
         classify: 4,
         page: 1,
-        per_page: 10,
+        per_page: 9999,
         ...filterParams
       }
 
-      axios({
-        url: 'https://order.cdqrmi.com/api/v1/work-order/list',
-        method: 'get',
-        headers: {
-          'Authorization': 'Bearer ' + this.getToken()
-        },
-        params: apiParams
+      // 使用项目统一API请求工单详情
+      workOrderList(apiParams).then(response => {
+        this.workOrderLoading = false
+        if (response.code === 200) {
+          this.workOrderDetailData = response.data.data.map(item => this.formatWorkOrderData(item))
+        } else {
+          this.$message.error(`获取工单详情失败：${response.msg || '未知错误'}`)
+          this.workOrderDetailData = []
+        }
+      }).catch(error => {
+        this.handleApiError(error)
       })
-        .then(response => {
-          this.workOrderLoading = false
-          if (response.data.code === 200) {
-            this.workOrderDetailData = response.data.data.map(item => this.formatWorkOrderData(item))
-          } else {
-            this.$message.error(`获取工单详情失败：${response.data.message || '未知错误'}`)
-            this.workOrderDetailData = []
-          }
-        })
-        .catch(error => {
-          this.handleApiError(error)
-        })
     },
 
     // 格式化工单数据
@@ -1062,15 +1166,30 @@ export default {
       return {
         id: item.id || '',
         title: item.title || '',
-        worker: item.worker_name || item.worker || '未分配',
-        status: this.formatStatus(item.status),
-        completion_time: item.completion_time
-          ? `${item.completion_time}小时`
-          : (item.status === 'ended' ? '0小时' : '未完成'),
+        worker: item.principals || '未分配', // 使用principals字段作为维修人员
+        status: this.formatStatus(item),
+        completion_time: this.calculateCompletionTime(item) || '未完成',
         create_time: item.create_time || '',
-        finish_time: item.finish_time || '未完成',
+        finish_time: item.is_end ? item.update_time : '未完成',
         area: this.formatArea(item.belongs || item.area)
       }
+    },
+
+    // 计算工单完成时长
+    calculateCompletionTime(item) {
+      if (!item.is_end || !item.create_time || !item.update_time) return null
+      const createTime = new Date(item.create_time).getTime()
+      const finishTime = new Date(item.update_time).getTime()
+      const hours = Math.round((finishTime - createTime) / (1000 * 60 * 60))
+      return `${hours}小时`
+    },
+
+    // 根据工单状态字段格式化状态文本
+    formatStatus(item) {
+      if (item.is_end === 1) return '已完成'
+      if (item.is_denied === 1) return '已驳回'
+      if (item.is_accept === 1) return '进行中'
+      return '待分配'
     },
 
     // 处理API错误
@@ -1078,23 +1197,11 @@ export default {
       this.workOrderLoading = false
       if (error.response && error.response.status === 401) {
         this.$message.error('认证失败，请重新登录')
-        // 可添加登录跳转逻辑：this.$router.push('/login');
       } else {
         this.$message.error('网络异常，无法获取工单详情，请检查网络连接')
       }
       console.error('工单详情API调用失败：', error)
       this.workOrderDetailData = []
-    },
-
-    // 格式化工单状态
-    formatStatus(status) {
-      const statusMap = {
-        'unassigned': '待分配',
-        'processing': '进行中',
-        'ended': '已完成',
-        'canceled': '已取消'
-      }
-      return statusMap[status] || status
     },
 
     // 格式化片区名称
@@ -1160,7 +1267,15 @@ export default {
           this.fetchWorkOrderTotalDetails()
           break
         case 1: // 未完成工单数量
-          this.$message.info('未完成工单详情功能待实现')
+          // 使用缓存筛选未完成工单
+          if (this.cachedWorkOrders) {
+            this.workOrderDialogTitle = '未完成工单详情'
+            this.workOrderDialogVisible = true
+            this.workOrderDetailData = this.filterCachedWorkOrders({ status: 'processing' })
+              .map(item => this.formatWorkOrderData(item))
+          } else {
+            this.$message.info('数据加载中，请稍后再试')
+          }
           break
         case 2: // 超时工单数量
           this.$message.info('超时工单详情功能待实现')

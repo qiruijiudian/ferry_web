@@ -53,143 +53,114 @@
       </div>
     </div>
 
-    <div class="section">
-      <h2 class="section-title"><i class="fas fa-chart-line" /> 效率与时效分析</h2>
-      <div class="chart-container">
-        <div class="chart-box">
-          <div class="chart-title">工单完成时长分布</div>
-          <div class="chart-wrapper">
-            <canvas ref="durationChart" />
-          </div>
-        </div>
-        <div class="chart-box">
-          <div class="chart-title">各类型工单平均时长</div>
-          <div class="chart-wrapper">
-            <canvas ref="typeDurationChart" />
-          </div>
+    <!-- 第一行：工单完成时长分布 + 全部维修人员工单完成情况 -->
+    <div class="chart-container">
+      <div class="chart-box">
+        <div class="chart-title">工单完成时长分布</div>
+        <div class="chart-wrapper">
+          <canvas ref="durationChart" />
         </div>
       </div>
-      <div class="chart-container">
-        <div class="chart-box">
-          <div class="chart-title">工单状态分布</div>
-          <div class="chart-wrapper">
-            <canvas ref="statusChart" />
-          </div>
+      <div class="chart-box">
+        <div class="chart-title">全部维修人员工单完成情况</div>
+        <div class="table-wrapper">
+          <el-table :data="workerData" style="width: 100%" height="240">
+            <el-table-column prop="rank" label="排名" width="50" />
+            <el-table-column prop="name" label="维修人员" width="100" />
+            <el-table-column prop="completed" label="完成工单数量" width="120" />
+            <el-table-column label="工单完成率" width="150">
+              <template slot-scope="scope">
+                <div class="completion-rate">
+                  <div class="completion-bar" :style="{ width: scope.row.completionRate + '%' }" />
+                </div>
+                <span>{{ scope.row.completionRate }}%</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="avgTime" label="平均完成时长(小时)" width="150" />
+            <el-table-column prop="reworkRate" label="返修率" width="100" />
+          </el-table>
         </div>
-        <div class="chart-box">
-          <div class="chart-title">团队TOP榜</div>
-          <div class="chart-wrapper">
-            <canvas ref="efficiencyChart" />
+      </div>
+    </div>
+
+    <!-- 第二行：各类型工单平均时长 + 团队TOP榜 -->
+    <div class="chart-container">
+      <div class="chart-box">
+        <div class="chart-title">各类型工单平均时长</div>
+        <div class="chart-wrapper">
+          <canvas ref="typeDurationChart" />
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">团队TOP榜</div>
+        <div class="chart-wrapper">
+          <canvas ref="efficiencyChart" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 第三行：工单状态分布 + 耗材使用分布 -->
+    <div class="chart-container">
+      <div class="chart-box">
+        <div class="chart-title">工单状态分布</div>
+        <div class="chart-wrapper">
+          <canvas ref="statusChart" />
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">耗材使用分布</div>
+        <div class="chart-wrapper">
+          <canvas ref="materialCostChart" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 第四行：工单类型分布 + 耗材使用TOP榜 -->
+    <div class="chart-container">
+      <div class="chart-box">
+        <div class="chart-title">工单类型分布</div>
+        <div class="chart-wrapper">
+          <canvas ref="workTypeChart" />
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">耗材使用TOP榜</div>
+        <div class="table-wrapper">
+          <el-table v-loading="materialLoading" :data="materialData" style="width: 100%" height="240">
+            <el-table-column prop="rank" label="排名" width="60" />
+            <el-table-column prop="name" label="耗材名称" min-width="200" />
+            <el-table-column prop="quantity" label="使用数量" width="100" align="center">
+              <template slot-scope="scope">
+                <span>{{ scope.row.quantity }}个</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="使用占比" width="120" align="center">
+              <template slot-scope="scope">
+                <div class="completion-rate">
+                  <div class="completion-bar" :style="{ width: scope.row.usageRatio + '%' }" />
+                </div>
+                <span>{{ scope.row.usageRatio }}%</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="usage" label="主要使用场景" min-width="150" />
+          </el-table>
+
+          <!-- 空状态提示 -->
+          <div v-if="materialData.length === 0 && !materialLoading" class="empty-state">
+            <i class="el-icon-box" />
+            <p>暂无耗材使用数据</p>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="section">
-      <h2 class="section-title"><i class="fas fa-clipboard-check" /> 服务质量分析</h2>
-
-      <!-- 全部维修工人详细数据表格 -->
-      <div class="chart-title" style="margin-top: 20px;">全部维修人员工单完成情况</div>
-      <div class="worker-ranking-container">
-        <el-table :data="workerData" style="width: 100%">
-          <el-table-column prop="rank" label="排名" width="50" />
-          <el-table-column prop="name" label="维修人员" width="100" />
-          <el-table-column prop="completed" label="完成工单数量" width="120" />
-          <el-table-column label="工单完成率" width="150">
-            <template slot-scope="scope">
-              <div class="completion-rate">
-                <div class="completion-bar" :style="{ width: scope.row.completionRate + '%' }" />
-              </div>
-              <span>{{ scope.row.completionRate }}%</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="avgTime" label="平均完成时长(小时)" width="150" />
-          <el-table-column prop="reworkRate" label="返修率" width="100" />
-        </el-table>
-      </div>
-
-      <!-- 隐藏维修人员TOP榜和高频问题类型图表 -->
-      <!-- <div class="chart-container">
-        <div class="chart-box">
-          <div class="chart-title">维修人员TOP榜（前10名）</div>
-          <div class="chart-wrapper">
-            <canvas ref="workerTopChart" />
-          </div>
-        </div>
-        <div class="chart-box">
-          <div class="chart-title">高频问题类型</div>
-          <div class="chart-wrapper">
-            <canvas ref="issueTypeChart" />
-          </div>
-        </div>
-      </div> -->
-
-      <!-- 隐藏返修工单明细 -->
-      <!-- <div class="chart-title" style="margin-top: 20px;">返修工单明细</div>
-      <el-table :data="reworkData" style="width: 100%">
-        <el-table-column prop="reworkId" label="返修单ID" width="150" />
-        <el-table-column prop="originalId" label="原工单ID" width="150" />
-        <el-table-column prop="worker" label="负责工人" width="100" />
-        <el-table-column prop="reason" label="返修原因" width="150" />
-        <el-table-column prop="date" label="返修日期" width="120" />
-      </el-table> -->
+    <!-- 耗材成本分析总结 -->
+    <div class="summary" style="margin-top: 20px;">
+      <h3>{{ costAnalysisSummary.title }}</h3>
+      <p v-for="(point, index) in costAnalysisSummary.points" :key="index">{{ index + 1 }}. {{ point }}</p>
     </div>
 
-    <div class="section">
-      <h2 class="section-title"><i class="fas fa-chart-pie" /> 耗材与成本分析</h2>
-
-      <!-- 图表区域：耗材成本分布和工单类型分布 -->
-      <div class="chart-container">
-        <div class="chart-box">
-          <div class="chart-title">耗材使用分布</div>
-          <div class="chart-wrapper">
-            <canvas ref="materialCostChart" />
-          </div>
-        </div>
-        <div class="chart-box">
-          <div class="chart-title">工单类型分布</div>
-          <div class="chart-wrapper">
-            <canvas ref="workTypeChart" />
-          </div>
-        </div>
-      </div>
-
-      <!-- 耗材TOP榜表格 -->
-      <div class="chart-title" style="margin-top: 20px;">耗材使用TOP榜</div>
-      <div class="worker-ranking-container">
-        <el-table v-loading="materialLoading" :data="materialData" style="width: 100%">
-          <el-table-column prop="rank" label="排名" width="60" />
-          <el-table-column prop="name" label="耗材名称" min-width="200" />
-          <el-table-column prop="quantity" label="使用数量" width="100" align="center">
-            <template slot-scope="scope">
-              <span>{{ scope.row.quantity }}个</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="使用占比" width="120" align="center">
-            <template slot-scope="scope">
-              <div class="completion-rate">
-                <div class="completion-bar" :style="{ width: scope.row.usageRatio + '%' }" />
-              </div>
-              <span>{{ scope.row.usageRatio }}%</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="usage" label="主要使用场景" min-width="150" />
-        </el-table>
-
-        <!-- 空状态提示 -->
-        <div v-if="materialData.length === 0 && !materialLoading" class="empty-state">
-          <i class="el-icon-box" />
-          <p>暂无耗材使用数据</p>
-        </div>
-      </div>
-
-      <!-- 耗材成本分析总结 -->
-      <div class="summary" style="margin-top: 20px;">
-        <h3>{{ costAnalysisSummary.title }}</h3>
-        <p v-for="(point, index) in costAnalysisSummary.points" :key="index">{{ index + 1 }}. {{ point }}</p>
-      </div>
-    </div>
-
+    <!-- 整体总结与建议 -->
     <div class="summary">
       <h3>整体总结与建议</h3>
       <p>1. 业务量稳步提升，团队效率保持高位，一次性修复率表现优异。</p>
@@ -413,23 +384,6 @@ export default {
         })
       })
     },
-
-    // 请求二：获取流程列表（使用项目统一API）
-    // fetchProcesses() {
-    //   return new Promise((resolve, reject) => {
-    //     processList({
-    //       per_page: 999999 // 只传per_page=999999
-    //     }).then(response => {
-    //       if (response.code === 200) {
-    //         resolve(response.data)
-    //       } else {
-    //         reject(new Error('流程列表请求失败: ' + response.msg))
-    //       }
-    //     }).catch(error => {
-    //       reject(error)
-    //     })
-    //   })
-    // },
 
     // 从缓存中获取工单列表数据
     getCachedWorkOrders() {
@@ -1015,100 +969,6 @@ export default {
         }
       })
 
-      // 维修人员TOP榜图表 - 注释掉初始化，因为已经隐藏
-      // const workerTopCtx = this.$refs.workerTopChart.getContext('2d')
-      // this.charts.workerTopChart = new window.Chart(workerTopCtx, {
-      //   type: 'bar',
-      //   data: {
-      //     labels: this.reportData.worker_completion.map(worker => worker.nick_name),
-      //     datasets: [
-      //       {
-      //         label: '完成工单数量',
-      //         data: this.reportData.worker_completion.map(worker => worker.count),
-      //         backgroundColor: 'rgba(59, 130, 246, 0.7)',
-      //         borderColor: 'rgb(59, 130, 246)',
-      //         borderWidth: 1,
-      //         yAxisID: 'y'
-      //       },
-      //       {
-      //         label: '工单完成率(%)',
-      //         data: this.reportData.worker_completion.map(worker => {
-      //           return this.reportData.total_count ? Math.round((worker.count / this.reportData.total_count) * 100) : 0
-      //         }),
-      //         backgroundColor: 'rgba(34, 197, 94, 0.7)',
-      //         borderColor: 'rgb(34, 197, 94)',
-      //         borderWidth: 1,
-      //         type: 'line',
-      //         yAxisID: 'y1'
-      //       }
-      //     ]
-      //   },
-      //   options: {
-      //     responsive: true,
-      //     maintainAspectRatio: false,
-      //     scales: {
-      //       y: {
-      //         type: 'linear',
-      //         position: 'left',
-      //         title: {
-      //           display: true,
-      //           text: '完成工单数量'
-      //         },
-      //         beginAtZero: true
-      //       },
-      //       y1: {
-      //         type: 'linear',
-      //         position: 'right',
-      //         title: {
-      //           display: true,
-      //           text: '工单完成率(%)'
-      //         },
-      //         beginAtZero: true,
-      //         max: 100,
-      //         grid: {
-      //           drawOnChartArea: false
-      //         }
-      //       }
-      //     }
-      //   }
-      // })
-
-      // 高频问题类型 - 注释掉初始化，因为已经隐藏
-      // const issueTypeCtx = this.$refs.issueTypeChart.getContext('2d')
-      // this.charts.issueTypeChart = new window.Chart(issueTypeCtx, {
-      //   type: 'pie',
-      //   data: {
-      //     labels: ['网络故障', '硬件损坏', '软件问题', '电源问题', '其他'],
-      //     datasets: [{
-      //       data: [25, 18, 15, 12, 30],
-      //       backgroundColor: [
-      //         'rgba(239, 68, 68, 0.7)',
-      //         'rgba(59, 130, 246, 0.7)',
-      //         'rgba(34, 197, 94, 0.7)',
-      //         'rgba(251, 191, 36, 0.7)',
-      //         'rgba(139, 92, 246, 0.7)'
-      //       ],
-      //       borderColor: [
-      //         'rgb(239, 68, 68)',
-      //         'rgb(59, 130, 246)',
-      //         'rgb(34, 197, 94)',
-      //         'rgb(251, 191, 36)',
-      //         'rgb(139, 92, 246)'
-      //       ],
-      //       borderWidth: 1
-      //     }]
-      //   },
-      //   options: {
-      //     responsive: true,
-      //     maintainAspectRatio: false,
-      //     plugins: {
-      //       legend: {
-      //         position: 'right'
-      //       }
-      //     }
-      //   }
-      // })
-
       // 耗材使用分布 - 修改：使用动态数据
       const materialCostCtx = this.$refs.materialCostChart.getContext('2d')
       this.charts.materialCostChart = new window.Chart(materialCostCtx, {
@@ -1631,33 +1491,16 @@ body {
   margin-right: 5px;
 }
 
-.section {
-  padding: 25px;
-  border-bottom: 1px solid #eaeaea;
-}
-
-.section:last-child {
-  border-bottom: none;
-}
-
-.section-title {
-  font-size: 20px;
-  margin-bottom: 20px;
-  color: #1e3a8a;
-  display: flex;
-  align-items: center;
-}
-
-.section-title i {
-  margin-right: 10px;
-  font-size: 22px;
-}
-
 .chart-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
   gap: 25px;
-  margin-top: 15px;
+  padding: 25px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.chart-container:last-child {
+  border-bottom: none;
 }
 
 .chart-box {
@@ -1678,6 +1521,11 @@ body {
 .chart-wrapper {
   height: 240px;
   position: relative;
+}
+
+.table-wrapper {
+  height: 240px;
+  overflow-y: auto;
 }
 
 .summary {
@@ -1701,11 +1549,6 @@ body {
   font-size: 14px;
   border-top: 1px solid #eaeaea;
   background: #f8fafc;
-}
-
-.worker-ranking-container {
-  margin-top: 20px;
-  overflow-x: auto;
 }
 
 .completion-rate {

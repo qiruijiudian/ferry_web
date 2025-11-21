@@ -108,8 +108,8 @@
         </el-table>
       </div>
 
-      <!-- 维修人员TOP榜 - 图表展示前10名 -->
-      <div class="chart-container">
+      <!-- 隐藏维修人员TOP榜和高频问题类型图表 -->
+      <!-- <div class="chart-container">
         <div class="chart-box">
           <div class="chart-title">维修人员TOP榜（前10名）</div>
           <div class="chart-wrapper">
@@ -122,17 +122,17 @@
             <canvas ref="issueTypeChart" />
           </div>
         </div>
-      </div>
+      </div> -->
 
-      <!-- 返修工单明细 -->
-      <div class="chart-title" style="margin-top: 20px;">返修工单明细</div>
+      <!-- 隐藏返修工单明细 -->
+      <!-- <div class="chart-title" style="margin-top: 20px;">返修工单明细</div>
       <el-table :data="reworkData" style="width: 100%">
         <el-table-column prop="reworkId" label="返修单ID" width="150" />
         <el-table-column prop="originalId" label="原工单ID" width="150" />
         <el-table-column prop="worker" label="负责工人" width="100" />
         <el-table-column prop="reason" label="返修原因" width="150" />
         <el-table-column prop="date" label="返修日期" width="120" />
-      </el-table>
+      </el-table> -->
     </div>
 
     <div class="section">
@@ -141,7 +141,7 @@
       <!-- 图表区域：耗材成本分布和工单类型分布 -->
       <div class="chart-container">
         <div class="chart-box">
-          <div class="chart-title">耗材成本分布</div>
+          <div class="chart-title">耗材使用分布</div>
           <div class="chart-wrapper">
             <canvas ref="materialCostChart" />
           </div>
@@ -157,31 +157,36 @@
       <!-- 耗材TOP榜表格 -->
       <div class="chart-title" style="margin-top: 20px;">耗材使用TOP榜</div>
       <div class="worker-ranking-container">
-        <el-table :data="materialData" style="width: 100%">
-          <el-table-column prop="rank" label="排名" width="50" />
-          <el-table-column prop="name" label="耗材名称" width="120" />
-          <el-table-column prop="quantity" label="使用数量" width="100" />
-          <el-table-column prop="unitCost" label="单位成本" width="100" />
-          <el-table-column prop="totalCost" label="总成本" width="100" />
-          <el-table-column label="占总耗材成本比例" width="150">
+        <el-table v-loading="materialLoading" :data="materialData" style="width: 100%">
+          <el-table-column prop="rank" label="排名" width="60" />
+          <el-table-column prop="name" label="耗材名称" min-width="200" />
+          <el-table-column prop="quantity" label="使用数量" width="100" align="center">
             <template slot-scope="scope">
-              <div class="completion-rate">
-                <div class="completion-bar" :style="{ width: scope.row.costRatio + '%' }" />
-              </div>
-              <span>{{ scope.row.costRatio }}%</span>
+              <span>{{ scope.row.quantity }}个</span>
             </template>
           </el-table-column>
-          <el-table-column prop="usage" label="主要使用场景" width="150" />
+          <el-table-column label="使用占比" width="120" align="center">
+            <template slot-scope="scope">
+              <div class="completion-rate">
+                <div class="completion-bar" :style="{ width: scope.row.usageRatio + '%' }" />
+              </div>
+              <span>{{ scope.row.usageRatio }}%</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="usage" label="主要使用场景" min-width="150" />
         </el-table>
+
+        <!-- 空状态提示 -->
+        <div v-if="materialData.length === 0 && !materialLoading" class="empty-state">
+          <i class="el-icon-box" />
+          <p>暂无耗材使用数据</p>
+        </div>
       </div>
 
       <!-- 耗材成本分析总结 -->
       <div class="summary" style="margin-top: 20px;">
-        <h3>耗材成本分析</h3>
-        <p>1. 电源适配器和硬盘占总耗材成本的76%，是成本控制的关键项。</p>
-        <p>2. 高频率消耗品（如网络接头）单价低但总消耗量较大，建议批量采购降低成本。</p>
-        <p>3. 工单类型中维修类占比45%，与高成本耗材使用量高度相关，可优化维修流程减少不必要的更换。</p>
-        <p>4. 建议针对占比前3的耗材建立安全库存预警机制，避免因缺货导致工单延误。</p>
+        <h3>{{ costAnalysisSummary.title }}</h3>
+        <p v-for="(point, index) in costAnalysisSummary.points" :key="index">{{ index + 1 }}. {{ point }}</p>
       </div>
     </div>
 
@@ -252,13 +257,8 @@ export default {
         { reworkId: 'RW-20231021-002', originalId: 'WO-20231016-078', worker: '李四', reason: '软件配置错误', date: '2023-10-21' },
         { reworkId: 'RW-20231022-003', originalId: 'WO-20231018-112', worker: '王五', reason: '线路连接问题', date: '2023-10-22' }
       ],
-      materialData: [
-        { rank: 1, name: '电源适配器', quantity: 42, unitCost: '¥25', totalCost: '¥1,050', costRatio: 42.9, usage: '设备更换、维修' },
-        { rank: 2, name: '硬盘(1TB)', quantity: 18, unitCost: '¥45', totalCost: '¥810', costRatio: 33.1, usage: '存储升级、故障更换' },
-        { rank: 3, name: '内存条(8GB)', quantity: 22, unitCost: '¥15', totalCost: '¥330', costRatio: 13.5, usage: '性能升级、故障更换' },
-        { rank: 4, name: 'RJ45网络接头', quantity: 85, unitCost: '¥3.5', totalCost: '¥297.5', costRatio: 12.1, usage: '网络维修、布线' },
-        { rank: 5, name: '网线(5米)', quantity: 32, unitCost: '¥4.2', totalCost: '¥134.4', costRatio: 5.5, usage: '网络布线、更换' }
-      ],
+      materialData: [], // 修改：清空硬编码数据，改为空数组
+      materialLoading: false, // 新增：耗材数据加载状态
       charts: {},
       reportData: {
         total_count: 0,
@@ -278,7 +278,8 @@ export default {
         processing_count: 0,
         unassigned_count: 0,
         worker_completion: [],
-        repair_type_stats: []
+        repair_type_stats: [],
+        consumable_stats: [] // 新增：确保有这个字段
       },
       // 工单详情相关数据
       workOrderDialogVisible: false,
@@ -340,6 +341,29 @@ export default {
       const seconds = String(now.getSeconds()).padStart(2, '0')
 
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    },
+    // 新增：动态生成耗材分析总结
+    costAnalysisSummary() {
+      if (!this.materialData.length) {
+        return {
+          title: '耗材使用分析',
+          points: ['暂无耗材使用数据可供分析']
+        }
+      }
+
+      const topMaterial = this.materialData[0]
+      const top3Materials = this.materialData.slice(0, 3)
+      const top3TotalRatio = top3Materials.reduce((sum, item) => sum + item.usageRatio, 0)
+
+      return {
+        title: '耗材使用分析',
+        points: [
+          `${topMaterial.name}使用数量最多，共${topMaterial.quantity}个，占总使用量的${topMaterial.usageRatio}%`,
+          `前3种耗材(${top3Materials.map(m => m.name).join('、')})占总使用量的${top3TotalRatio.toFixed(1)}%，建议重点关注库存管理`,
+          `耗材种类共计${this.materialData.length}种，反映了维修工作的多样性`,
+          this.materialData.length > 10 ? '耗材种类较多，建议优化库存结构，减少不常用耗材的库存积压' : '耗材种类相对集中，便于库存管理'
+        ]
+      }
     }
   },
   mounted() {
@@ -473,6 +497,8 @@ export default {
           this.updateWorkerTopChart()
           this.updateEfficiencyChart()
           this.updateTypeDurationChart()
+          this.updateMaterialData() // 新增：更新耗材数据
+          this.updateMaterialCharts() // 新增：更新耗材图表
           this.filters.duration = 'week'
         } else {
           console.error('获取报表数据失败:', response.data.message)
@@ -513,6 +539,86 @@ export default {
       }
     },
 
+    // 新增：更新耗材数据方法
+    updateMaterialData() {
+      this.materialLoading = true
+      if (this.reportData.consumable_stats && this.reportData.consumable_stats.length > 0) {
+        // 按使用数量排序
+        const sortedMaterials = [...this.reportData.consumable_stats].sort((a, b) => b.total_count - a.total_count)
+
+        this.materialData = sortedMaterials.map((material, index) => {
+          // 计算占总耗材比例
+          const totalConsumables = sortedMaterials.reduce((sum, item) => sum + item.total_count, 0)
+          const usageRatio = totalConsumables > 0 ? ((material.total_count / totalConsumables) * 100).toFixed(1) : 0
+
+          return {
+            rank: index + 1,
+            name: material.name,
+            quantity: material.total_count,
+            usageRatio: parseFloat(usageRatio),
+            usage: this.getMaterialUsageDescription(material.name)
+          }
+        })
+      } else {
+        // 如果没有耗材数据，显示空状态
+        this.materialData = []
+      }
+      this.materialLoading = false
+    },
+
+    // 新增：根据耗材名称推断使用场景
+    getMaterialUsageDescription(materialName) {
+      const usageMap = {
+        '控制面板': '设备控制、维修',
+        '开关控制面板': '电气控制、开关维修',
+        '风机金属波纹管': '通风系统、风机连接',
+        '胶垫': '密封、防水处理',
+        '湿化瓶': '供氧系统、医疗设备',
+        '保险管': '电路保护、电气维修',
+        '扎带': '线缆固定、整理',
+        '生胶带': '管道密封、螺纹连接',
+        '活接': '管道连接、维修',
+        '外丝直接': '管道连接件',
+        '波纹管': '管道连接、柔性连接',
+        '垫片': '密封、接口保护'
+      }
+
+      // 查找匹配的使用场景
+      for (const [key, value] of Object.entries(usageMap)) {
+        if (materialName.includes(key)) {
+          return value
+        }
+      }
+
+      return '通用维修'
+    },
+
+    // 新增：更新耗材图表
+    updateMaterialCharts() {
+      this.updateMaterialCostChart()
+    },
+
+    // 新增：更新耗材成本分布图表
+    updateMaterialCostChart() {
+      if (this.charts.materialCostChart && this.materialData.length > 0) {
+        // 取前5种耗材显示，其他归为"其他"
+        const topMaterials = this.materialData.slice(0, 5)
+        const othersCount = this.materialData.slice(5).reduce((sum, item) => sum + item.quantity, 0)
+
+        const labels = topMaterials.map(item => item.name)
+        const data = topMaterials.map(item => item.quantity)
+
+        if (othersCount > 0) {
+          labels.push('其他')
+          data.push(othersCount)
+        }
+
+        this.charts.materialCostChart.data.labels = labels
+        this.charts.materialCostChart.data.datasets[0].data = data
+        this.charts.materialCostChart.update()
+      }
+    },
+
     // 更新工单完成时长分布图表
     updateDurationChart() {
       if (this.charts.durationChart) {
@@ -550,11 +656,18 @@ export default {
       }
     },
 
-    // 更新维修人员数据
+    // 修复：更新维修人员数据 - 修正工单完成率计算
     updateWorkerData() {
       const sortedWorkers = [...this.reportData.worker_completion].sort((a, b) => b.count - a.count)
+
+      // 计算所有维修人员完成的总工单数（用于计算个人占比）
+      const totalCompletedByAllWorkers = sortedWorkers.reduce((sum, worker) => sum + worker.count, 0)
+
       this.workerData = sortedWorkers.map((worker, index) => {
-        const completionRate = this.reportData.total_count ? Math.round((worker.count / this.reportData.total_count) * 100) : 0
+        // 修复：正确计算工单完成率 - 使用该维修人员完成的工单数占总完成工单数的比例
+        const completionRate = totalCompletedByAllWorkers > 0
+          ? Math.round((worker.count / totalCompletedByAllWorkers) * 100) : 0
+
         return {
           rank: index + 1,
           name: worker.nick_name,
@@ -574,8 +687,11 @@ export default {
 
         this.charts.workerTopChart.data.labels = topWorkers.map(worker => worker.nick_name)
         this.charts.workerTopChart.data.datasets[0].data = topWorkers.map(worker => worker.count)
+
+        // 计算所有维修人员完成的总工单数（用于计算个人占比）
+        const totalCompletedByAllWorkers = sortedWorkers.reduce((sum, worker) => sum + worker.count, 0)
         this.charts.workerTopChart.data.datasets[1].data = topWorkers.map(worker => {
-          return this.reportData.total_count ? Math.round((worker.count / this.reportData.total_count) * 100) : 0
+          return totalCompletedByAllWorkers > 0 ? Math.round((worker.count / totalCompletedByAllWorkers) * 100) : 0
         })
         this.charts.workerTopChart.update()
       }
@@ -655,6 +771,8 @@ export default {
           this.updateWorkerTopChart()
           this.updateEfficiencyChart()
           this.updateTypeDurationChart()
+          this.updateMaterialData() // 新增：更新耗材数据
+          this.updateMaterialCharts() // 新增：更新耗材图表
 
           this.$message({
             message: `已应用筛选: 时长=${this.getDurationText(this.filters.duration)}, 片区=${this.getAreaText(this.filters.area)}`,
@@ -897,122 +1015,110 @@ export default {
         }
       })
 
-      // 维修人员TOP榜图表
-      const workerTopCtx = this.$refs.workerTopChart.getContext('2d')
-      this.charts.workerTopChart = new window.Chart(workerTopCtx, {
-        type: 'bar',
-        data: {
-          labels: this.reportData.worker_completion.map(worker => worker.nick_name),
-          datasets: [
-            {
-              label: '完成工单数量',
-              data: this.reportData.worker_completion.map(worker => worker.count),
-              backgroundColor: 'rgba(59, 130, 246, 0.7)',
-              borderColor: 'rgb(59, 130, 246)',
-              borderWidth: 1,
-              yAxisID: 'y'
-            },
-            {
-              label: '工单完成率(%)',
-              data: this.reportData.worker_completion.map(worker => {
-                return this.reportData.total_count ? Math.round((worker.count / this.reportData.total_count) * 100) : 0
-              }),
-              backgroundColor: 'rgba(34, 197, 94, 0.7)',
-              borderColor: 'rgb(34, 197, 94)',
-              borderWidth: 1,
-              type: 'line',
-              yAxisID: 'y1'
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              type: 'linear',
-              position: 'left',
-              title: {
-                display: true,
-                text: '完成工单数量'
-              },
-              beginAtZero: true
-            },
-            y1: {
-              type: 'linear',
-              position: 'right',
-              title: {
-                display: true,
-                text: '工单完成率(%)'
-              },
-              beginAtZero: true,
-              max: 100,
-              grid: {
-                drawOnChartArea: false
-              }
-            }
-          }
-        }
-      })
+      // 维修人员TOP榜图表 - 注释掉初始化，因为已经隐藏
+      // const workerTopCtx = this.$refs.workerTopChart.getContext('2d')
+      // this.charts.workerTopChart = new window.Chart(workerTopCtx, {
+      //   type: 'bar',
+      //   data: {
+      //     labels: this.reportData.worker_completion.map(worker => worker.nick_name),
+      //     datasets: [
+      //       {
+      //         label: '完成工单数量',
+      //         data: this.reportData.worker_completion.map(worker => worker.count),
+      //         backgroundColor: 'rgba(59, 130, 246, 0.7)',
+      //         borderColor: 'rgb(59, 130, 246)',
+      //         borderWidth: 1,
+      //         yAxisID: 'y'
+      //       },
+      //       {
+      //         label: '工单完成率(%)',
+      //         data: this.reportData.worker_completion.map(worker => {
+      //           return this.reportData.total_count ? Math.round((worker.count / this.reportData.total_count) * 100) : 0
+      //         }),
+      //         backgroundColor: 'rgba(34, 197, 94, 0.7)',
+      //         borderColor: 'rgb(34, 197, 94)',
+      //         borderWidth: 1,
+      //         type: 'line',
+      //         yAxisID: 'y1'
+      //       }
+      //     ]
+      //   },
+      //   options: {
+      //     responsive: true,
+      //     maintainAspectRatio: false,
+      //     scales: {
+      //       y: {
+      //         type: 'linear',
+      //         position: 'left',
+      //         title: {
+      //           display: true,
+      //           text: '完成工单数量'
+      //         },
+      //         beginAtZero: true
+      //       },
+      //       y1: {
+      //         type: 'linear',
+      //         position: 'right',
+      //         title: {
+      //           display: true,
+      //           text: '工单完成率(%)'
+      //         },
+      //         beginAtZero: true,
+      //         max: 100,
+      //         grid: {
+      //           drawOnChartArea: false
+      //         }
+      //       }
+      //     }
+      //   }
+      // })
 
-      // 高频问题类型
-      const issueTypeCtx = this.$refs.issueTypeChart.getContext('2d')
-      this.charts.issueTypeChart = new window.Chart(issueTypeCtx, {
-        type: 'pie',
-        data: {
-          labels: ['网络故障', '硬件损坏', '软件问题', '电源问题', '其他'],
-          datasets: [{
-            data: [25, 18, 15, 12, 30],
-            backgroundColor: [
-              'rgba(239, 68, 68, 0.7)',
-              'rgba(59, 130, 246, 0.7)',
-              'rgba(34, 197, 94, 0.7)',
-              'rgba(251, 191, 36, 0.7)',
-              'rgba(139, 92, 246, 0.7)'
-            ],
-            borderColor: [
-              'rgb(239, 68, 68)',
-              'rgb(59, 130, 246)',
-              'rgb(34, 197, 94)',
-              'rgb(251, 191, 36)',
-              'rgb(139, 92, 246)'
-            ],
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'right'
-            }
-          }
-        }
-      })
+      // 高频问题类型 - 注释掉初始化，因为已经隐藏
+      // const issueTypeCtx = this.$refs.issueTypeChart.getContext('2d')
+      // this.charts.issueTypeChart = new window.Chart(issueTypeCtx, {
+      //   type: 'pie',
+      //   data: {
+      //     labels: ['网络故障', '硬件损坏', '软件问题', '电源问题', '其他'],
+      //     datasets: [{
+      //       data: [25, 18, 15, 12, 30],
+      //       backgroundColor: [
+      //         'rgba(239, 68, 68, 0.7)',
+      //         'rgba(59, 130, 246, 0.7)',
+      //         'rgba(34, 197, 94, 0.7)',
+      //         'rgba(251, 191, 36, 0.7)',
+      //         'rgba(139, 92, 246, 0.7)'
+      //       ],
+      //       borderColor: [
+      //         'rgb(239, 68, 68)',
+      //         'rgb(59, 130, 246)',
+      //         'rgb(34, 197, 94)',
+      //         'rgb(251, 191, 36)',
+      //         'rgb(139, 92, 246)'
+      //       ],
+      //       borderWidth: 1
+      //     }]
+      //   },
+      //   options: {
+      //     responsive: true,
+      //     maintainAspectRatio: false,
+      //     plugins: {
+      //       legend: {
+      //         position: 'right'
+      //       }
+      //     }
+      //   }
+      // })
 
-      // 耗材成本分布
+      // 耗材使用分布 - 修改：使用动态数据
       const materialCostCtx = this.$refs.materialCostChart.getContext('2d')
       this.charts.materialCostChart = new window.Chart(materialCostCtx, {
         type: 'doughnut',
         data: {
-          labels: ['电源适配器', '硬盘', '内存条', '网络接头', '其他'],
+          labels: ['加载中...'],
           datasets: [{
-            data: [42.9, 33.1, 13.5, 12.1, 5.5],
-            backgroundColor: [
-              'rgba(239, 68, 68, 0.7)',
-              'rgba(59, 130, 246, 0.7)',
-              'rgba(34, 197, 94, 0.7)',
-              'rgba(251, 191, 36, 0.7)',
-              'rgba(139, 92, 246, 0.7)'
-            ],
-            borderColor: [
-              'rgb(239, 68, 68)',
-              'rgb(59, 130, 246)',
-              'rgb(34, 197, 94)',
-              'rgb(251, 191, 36)',
-              'rgb(139, 92, 246)'
-            ],
+            data: [100],
+            backgroundColor: ['rgba(200, 200, 200, 0.7)'],
+            borderColor: ['rgb(200, 200, 200)'],
             borderWidth: 1
           }]
         },
@@ -1616,6 +1722,24 @@ body {
   height: 100%;
   background-color: #3b82f6;
   border-radius: 4px;
+}
+
+/* 新增：空状态样式 */
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #909399;
+}
+
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.empty-state p {
+  font-size: 16px;
+  margin: 0;
 }
 
 @media (max-width: 768px) {

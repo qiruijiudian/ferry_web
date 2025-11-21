@@ -26,6 +26,16 @@ export function workOrderList(params) {
     params
   })
 }
+
+// 工单列表
+export function workOrderListAnalysis(params) {
+  return request({
+    url: '/api/v1/analysis/list',
+    method: 'get',
+    params
+  })
+}
+
 // 项目列表
 export function projectList(params) {
   return request({

@@ -225,8 +225,8 @@
 
 <script>
 // 导入项目已有的API方法，与其他页面保持一致
-import { workOrderList } from '@/api/process/work-order'
-import { processList } from '@/api/process/admin/process'
+import { workOrderListAnalysis } from '@/api/process/work-order'
+// import { processList } from '@/api/process/admin/process'
 // import { listProcess } from '@/api/process/process' // 假设流程接口路径，根据实际项目调整
 import axios from 'axios'
 
@@ -389,18 +389,18 @@ export default {
       })
 
       // 2. 流程列表请求（仅per_page=999999）
-      this.fetchProcesses().then(data => {
-        this.cachedProcesses = data
-        console.log('流程列表数据已缓存', data)
-      }).catch(err => {
-        console.error('流程列表预请求失败', err)
-      })
+      // this.fetchProcesses().then(data => {
+      //   this.cachedProcesses = data
+      //   console.log('流程列表数据已缓存', data)
+      // }).catch(err => {
+      //   console.error('流程列表预请求失败', err)
+      // })
     },
 
     // 请求一：获取工单列表（使用项目统一API）
     fetchWorkOrders() {
       return new Promise((resolve, reject) => {
-        workOrderList({
+        workOrderListAnalysis({
           classify: 4 // 只传classify=4，不带per_page参数
         }).then(response => {
           if (response.code === 200) {
@@ -415,21 +415,21 @@ export default {
     },
 
     // 请求二：获取流程列表（使用项目统一API）
-    fetchProcesses() {
-      return new Promise((resolve, reject) => {
-        processList({
-          per_page: 999999 // 只传per_page=999999
-        }).then(response => {
-          if (response.code === 200) {
-            resolve(response.data)
-          } else {
-            reject(new Error('流程列表请求失败: ' + response.msg))
-          }
-        }).catch(error => {
-          reject(error)
-        })
-      })
-    },
+    // fetchProcesses() {
+    //   return new Promise((resolve, reject) => {
+    //     processList({
+    //       per_page: 999999 // 只传per_page=999999
+    //     }).then(response => {
+    //       if (response.code === 200) {
+    //         resolve(response.data)
+    //       } else {
+    //         reject(new Error('流程列表请求失败: ' + response.msg))
+    //       }
+    //     }).catch(error => {
+    //       reject(error)
+    //     })
+    //   })
+    // },
 
     // 从缓存中获取工单列表数据
     getCachedWorkOrders() {
@@ -1215,7 +1215,7 @@ export default {
       }
 
       // 使用项目统一API请求工单详情
-      workOrderList(apiParams).then(response => {
+      workOrderListAnalysis(apiParams).then(response => {
         this.workOrderLoading = false
         if (response.code === 200) {
           this.workOrderDetailData = response.data.data.map(item => this.formatWorkOrderData(item))
@@ -1254,7 +1254,7 @@ export default {
       }
 
       // 使用项目统一API请求工单详情
-      workOrderList(apiParams).then(response => {
+      workOrderListAnalysis(apiParams).then(response => {
         this.workOrderLoading = false
         if (response.code === 200) {
           this.workOrderDetailData = response.data.data.map(item => this.formatWorkOrderData(item))

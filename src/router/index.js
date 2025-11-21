@@ -40,6 +40,16 @@ import Layout from '@/layout'
  */
 export const constantRoutes = [
   {
+    path: '/report/maintenance',
+    component: () => import('@/views/process/list/maintenance-report.vue'),
+    name: 'MaintenanceReport',
+    meta: {
+      title: '维修工单分析报告',
+      noCache: true
+    },
+    hidden: true
+  },
+  {
     path: '/redirect',
     component: Layout,
     hidden: true,

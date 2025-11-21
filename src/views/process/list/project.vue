@@ -184,7 +184,6 @@ export default {
         this.queryParams.pageIndex = response.data.page
         this.queryParams.pageSize = response.data.per_page
         this.total = response.data.total_count
-        this.total = 11
         // this.loading = false
         console.log('form: ', this.queryParams.pageIndex, this.queryParams.pageSize, this.total)
         console.log('ticketList: ', response.data)

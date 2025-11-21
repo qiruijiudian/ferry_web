@@ -10,7 +10,7 @@ NProgress.configure({ showSpinner: false }) // NProgress Configuration
 
 store.dispatch('settings/getSystemSettings')
 
-const whiteList = ['/login', '/auth-redirect'] // no redirect whitelist
+const whiteList = ['/login', '/auth-redirect', '/report/maintenance'] // no redirect whitelist
 
 router.beforeEach(async(to, from, next) => {
   // start progress bar

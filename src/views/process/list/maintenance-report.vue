@@ -53,7 +53,90 @@
       </div>
     </div>
 
-    <!-- 第一行：工单完成时长分布 + 全部维修人员工单完成情况 -->
+    <!-- 第一行：全部维修人员工单完成情况（占整行） -->
+    <div class="full-width-section">
+      <div class="section-header">
+        <h3 class="section-title">全部维修人员工单完成情况</h3>
+        <div class="section-actions">
+          <el-button v-if="workerData.length > 10 && !showAllWorkers" type="text" icon="el-icon-arrow-down" @click="showAllWorkers = true">
+            展开全部 {{ workerData.length }} 条数据
+          </el-button>
+          <el-button v-if="workerData.length > 10 && showAllWorkers" type="text" icon="el-icon-arrow-up" @click="showAllWorkers = false">
+            收起至前10条
+          </el-button>
+        </div>
+      </div>
+      <div class="table-container">
+        <el-table
+          v-loading="!workerData.length"
+          :data="showAllWorkers ? workerData : workerData.slice(0, 10)"
+          style="width: 100%"
+          :height="tableHeight"
+        >
+          <el-table-column prop="rank" label="排名" width="60" />
+          <el-table-column prop="name" label="维修人员" width="120" />
+          <el-table-column prop="completed" label="完成工单数量" width="130" />
+          <el-table-column label="工单完成率" width="150">
+            <template slot-scope="scope">
+              <div class="completion-rate">
+                <div class="completion-bar" :style="{ width: scope.row.completionRate + '%' }" />
+              </div>
+              <span>{{ scope.row.completionRate }}%</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="avgTime" label="平均完成时长(小时)" width="160" />
+          <el-table-column prop="reworkRate" label="返修率" width="100" />
+        </el-table>
+      </div>
+    </div>
+
+    <!-- 第二行：耗材使用TOP榜（占整行） -->
+    <div class="full-width-section">
+      <div class="section-header">
+        <h3 class="section-title">耗材使用TOP榜</h3>
+        <div class="section-actions">
+          <el-button v-if="materialData.length > 10 && !showAllMaterials" type="text" icon="el-icon-arrow-down" @click="showAllMaterials = true">
+            展开全部 {{ materialData.length }} 条数据
+          </el-button>
+          <el-button v-if="materialData.length > 10 && showAllMaterials" type="text" icon="el-icon-arrow-up" @click="showAllMaterials = false">
+            收起至前10条
+          </el-button>
+        </div>
+      </div>
+      <div class="table-container">
+        <el-table
+          v-loading="materialLoading"
+          :data="showAllMaterials ? materialData : materialData.slice(0, 10)"
+          style="width: 100%"
+          :height="tableHeight"
+        >
+          <el-table-column prop="rank" label="排名" width="60" />
+          <el-table-column prop="name" label="耗材名称" min-width="200" />
+          <el-table-column prop="quantity" label="使用数量" width="100" align="center">
+            <template slot-scope="scope">
+              <span>{{ scope.row.quantity }}个</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="使用占比" width="120" align="center">
+            <template slot-scope="scope">
+              <div class="completion-rate">
+                <div class="completion-bar" :style="{ width: scope.row.usageRatio + '%' }" />
+              </div>
+              <span>{{ scope.row.usageRatio }}%</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="usage" label="主要使用场景" min-width="180" />
+        </el-table>
+
+        <!-- 空状态提示 -->
+        <div v-if="materialData.length === 0 && !materialLoading" class="empty-state">
+          <i class="el-icon-box" />
+          <p>暂无耗材使用数据</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第三行：三个图表 -->
     <div class="chart-container">
       <div class="chart-box">
         <div class="chart-title">工单完成时长分布</div>
@@ -61,30 +144,6 @@
           <canvas ref="durationChart" />
         </div>
       </div>
-      <div class="chart-box">
-        <div class="chart-title">全部维修人员工单完成情况</div>
-        <div class="table-wrapper">
-          <el-table :data="workerData" style="width: 100%" height="240">
-            <el-table-column prop="rank" label="排名" width="50" />
-            <el-table-column prop="name" label="维修人员" width="100" />
-            <el-table-column prop="completed" label="完成工单数量" width="120" />
-            <el-table-column label="工单完成率" width="150">
-              <template slot-scope="scope">
-                <div class="completion-rate">
-                  <div class="completion-bar" :style="{ width: scope.row.completionRate + '%' }" />
-                </div>
-                <span>{{ scope.row.completionRate }}%</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="avgTime" label="平均完成时长(小时)" width="150" />
-            <el-table-column prop="reworkRate" label="返修率" width="100" />
-          </el-table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 第二行：各类型工单平均时长 + 团队TOP榜 -->
-    <div class="chart-container">
       <div class="chart-box">
         <div class="chart-title">各类型工单平均时长</div>
         <div class="chart-wrapper">
@@ -99,7 +158,7 @@
       </div>
     </div>
 
-    <!-- 第三行：工单状态分布 + 耗材使用分布 -->
+    <!-- 第四行：工单状态分布 + 耗材使用分布 + 工单类型分布 -->
     <div class="chart-container">
       <div class="chart-box">
         <div class="chart-title">工单状态分布</div>
@@ -113,43 +172,10 @@
           <canvas ref="materialCostChart" />
         </div>
       </div>
-    </div>
-
-    <!-- 第四行：工单类型分布 + 耗材使用TOP榜 -->
-    <div class="chart-container">
       <div class="chart-box">
         <div class="chart-title">工单类型分布</div>
         <div class="chart-wrapper">
           <canvas ref="workTypeChart" />
-        </div>
-      </div>
-      <div class="chart-box">
-        <div class="chart-title">耗材使用TOP榜</div>
-        <div class="table-wrapper">
-          <el-table v-loading="materialLoading" :data="materialData" style="width: 100%" height="240">
-            <el-table-column prop="rank" label="排名" width="60" />
-            <el-table-column prop="name" label="耗材名称" min-width="200" />
-            <el-table-column prop="quantity" label="使用数量" width="100" align="center">
-              <template slot-scope="scope">
-                <span>{{ scope.row.quantity }}个</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="使用占比" width="120" align="center">
-              <template slot-scope="scope">
-                <div class="completion-rate">
-                  <div class="completion-bar" :style="{ width: scope.row.usageRatio + '%' }" />
-                </div>
-                <span>{{ scope.row.usageRatio }}%</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="usage" label="主要使用场景" min-width="150" />
-          </el-table>
-
-          <!-- 空状态提示 -->
-          <div v-if="materialData.length === 0 && !materialLoading" class="empty-state">
-            <i class="el-icon-box" />
-            <p>暂无耗材使用数据</p>
-          </div>
         </div>
       </div>
     </div>
@@ -267,7 +293,11 @@ export default {
       },
       // 缓存两个请求的数据
       cachedWorkOrders: null, // 缓存请求一：工单列表数据
-      cachedProcesses: null // 缓存请求二：流程列表数据
+      cachedProcesses: null, // 缓存请求二：流程列表数据
+      // 新增：表格展开状态
+      showAllWorkers: false,
+      showAllMaterials: false,
+      tableHeight: '400px' // 表格默认高度
     }
   },
   computed: {
@@ -1266,7 +1296,7 @@ export default {
     // 滚动到维修人员表格
     scrollToWorkerTable() {
       this.$nextTick(() => {
-        const element = document.querySelector('.worker-ranking-container')
+        const element = document.querySelector('.full-width-section')
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'start' })
           element.style.transition = 'background-color 0.5s'
@@ -1491,9 +1521,40 @@ body {
   margin-right: 5px;
 }
 
+/* 新增：全宽区域样式 */
+.full-width-section {
+  padding: 25px;
+  border-bottom: 1px solid #eaeaea;
+  background: white;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-title {
+  font-size: 18px;
+  color: #1e3a8a;
+  margin: 0;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+}
+
+.table-container {
+  position: relative;
+  min-height: 400px;
+}
+
+/* 图表容器样式 */
 .chart-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: 25px;
   padding: 25px;
   border-bottom: 1px solid #eaeaea;
@@ -1521,11 +1582,6 @@ body {
 .chart-wrapper {
   height: 240px;
   position: relative;
-}
-
-.table-wrapper {
-  height: 240px;
-  overflow-y: auto;
 }
 
 .summary {
@@ -1572,6 +1628,11 @@ body {
   text-align: center;
   padding: 40px;
   color: #909399;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
 }
 
 .empty-state i {
@@ -1606,6 +1667,12 @@ body {
 
   .filter-select {
     width: 100%;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 }
 

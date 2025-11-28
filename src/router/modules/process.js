@@ -51,6 +51,12 @@ const processRouter = {
       component: () => import('@/views/process/list/maintenance-report'),
       name: 'MaintenanceReport',
       meta: { title: '维修分析报告', icon: 'chart' }
+    },
+    {
+      path: 'consumable',
+      component: () => import('@/views/process/list/consumable-management'),
+      name: 'ConsumableManagement',
+      meta: { title: '耗材管理', icon: 'box' }
     }
   ]
 }

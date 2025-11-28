@@ -119,6 +119,8 @@
     </div>
 
     <!-- 第二行：耗材使用TOP榜（占整行） -->
+    <!-- 注释掉耗材使用TOP榜部分 -->
+    <!--
     <div class="full-width-section">
       <div class="section-header">
         <h3 class="section-title">耗材使用TOP榜</h3>
@@ -162,6 +164,7 @@
         </div>
       </div>
     </div>
+    -->
 
     <!-- 第三行：三个图表 -->
     <div class="chart-container">
@@ -194,12 +197,15 @@
           <canvas ref="statusChart" />
         </div>
       </div>
+      <!-- 注释掉耗材使用分布图表 -->
+      <!--
       <div class="chart-box">
         <div class="chart-title">耗材使用分布</div>
         <div class="chart-wrapper">
           <canvas ref="materialCostChart" />
         </div>
       </div>
+      -->
       <div class="chart-box">
         <div class="chart-title">工单类型分布</div>
         <div class="chart-wrapper">
@@ -208,21 +214,24 @@
       </div>
     </div>
 
-    <!-- 耗材成本分析总结 -->
+    <!-- 注释掉耗材成本分析总结 -->
+    <!--
     <div class="summary" style="margin-top: 20px;">
       <h3>{{ costAnalysisSummary.title }}</h3>
       <p v-for="(point, index) in costAnalysisSummary.points" :key="index">{{ index + 1 }}. {{ point }}</p>
     </div>
+    -->
 
     <!-- 整体总结与建议 -->
     <div class="summary">
       <h3>整体总结与建议</h3>
       <p>1. 业务量稳步提升，团队效率保持高位，一次性修复率表现优异。</p>
       <p>2. 主机类和自控类工单平均时长偏高，建议重点分析原因并优化流程。</p>
-      <p>3. 电源适配器耗材成本占总成本42.9%，建议寻找替代供应商或优化采购策略。</p>
-      <p>4. 网络故障类工单占比最高，建议加强相关技能培训。</p>
-      <p>5. 长时间未完成工单主要原因是配件短缺，建议优化库存管理。</p>
-      <p>6. 维修人员表现差异明显，建议开展技能共享与培训，提升整体服务质量。</p>
+      <!-- 注释掉耗材相关建议 -->
+      <!-- <p>3. 电源适配器耗材成本占总成本42.9%，建议寻找替代供应商或优化采购策略。</p> -->
+      <p>3. 网络故障类工单占比最高，建议加强相关技能培训。</p>
+      <p>4. 长时间未完成工单主要原因是配件短缺，建议优化库存管理。</p>
+      <p>5. 维修人员表现差异明显，建议开展技能共享与培训，提升整体服务质量。</p>
     </div>
 
     <!-- 工单详情对话框 -->
@@ -2188,7 +2197,8 @@ body {
   border-radius: 4px;
 }
 
-/* 新增：空状态样式 */
+/* 注释掉空状态样式 */
+/*
 .empty-state {
   text-align: center;
   padding: 40px;
@@ -2210,6 +2220,7 @@ body {
   font-size: 16px;
   margin: 0;
 }
+*/
 
 /* 新增：图表悬停效果 */
 .chart-wrapper canvas {

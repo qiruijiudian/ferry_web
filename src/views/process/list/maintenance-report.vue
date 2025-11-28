@@ -1732,7 +1732,7 @@ export default {
           }
           break
         case 2: // 超时工单数量
-          this.$message.info('超时工单详情功能待实现')
+          this.fetchTimeoutWorkOrderDetails()
           break
         case 3: // 返修工单数量
           this.$message.info('返修工单详情功能待实现')
@@ -1749,6 +1749,84 @@ export default {
         default:
           return
       }
+    },
+    // 新增：获取超时工单详情（>24小时）
+    fetchTimeoutWorkOrderDetails() {
+      this.workOrderLoading = true
+      this.workOrderDialogTitle = '超时工单详情（完成时间>24小时）'
+      this.workOrderDialogVisible = true
+
+      // 重置分页和搜索
+      this.workOrderCurrentPage = 1
+      this.workOrderSearch = ''
+
+      const filterParams = this.getFilterParams()
+
+      // 设置时间范围筛选条件：>24小时
+      const apiParams = {
+        classify: 4,
+        page: 1,
+        per_page: 100,
+        min_time: 24, // 最小24小时
+        max_time: 9999, // 设置一个很大的值来表示无上限
+        ...filterParams
+      }
+
+      console.log('超时工单请求参数:', apiParams)
+
+      // 使用axios直接请求
+      axios({
+        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis/list',
+        method: 'get',
+        params: apiParams,
+        timeout: 30000,
+        headers: {
+          'Authorization': 'Bearer ' + this.getToken()
+        }
+      }).then(response => {
+        this.workOrderLoading = false
+        console.log('超时工单API响应:', response.data)
+
+        if (response.data.code === 200) {
+          if (response.data.data && response.data.data.data) {
+            this.workOrderDetailData = response.data.data.data.map(item => this.formatWorkOrderData(item))
+            console.log(`成功加载 ${this.workOrderDetailData.length} 条超时工单记录`)
+
+            // 更新是否有更多数据
+            this.hasMoreData = response.data.data.total_count > response.data.data.data.length
+
+            // 如果数据量很大，提示用户
+            if (response.data.data.total_count > 100) {
+              this.$message.warning(`共有 ${response.data.data.total_count} 条超时工单记录，当前显示前100条。如需查看全部，请使用筛选功能。`)
+            }
+
+            // 如果没有超时工单，显示提示信息
+            if (this.workOrderDetailData.length === 0) {
+              this.$message.info('当前筛选条件下没有超时工单（完成时间>24小时）')
+            }
+          } else {
+            this.workOrderDetailData = []
+            console.warn('超时工单数据格式异常:', response.data)
+          }
+        } else {
+          this.$message.error(`获取超时工单详情失败：${response.data.msg || '未知错误'}`)
+          this.workOrderDetailData = []
+        }
+      }).catch(error => {
+        this.workOrderLoading = false
+        console.error('请求超时工单失败:', error)
+
+        if (error.code === 'ECONNABORTED') {
+          this.$message.error('请求超时，请尝试缩小筛选范围或联系管理员')
+        } else if (error.response) {
+          this.$message.error(`服务器错误: ${error.response.status} - ${(error.response.data && error.response.data.msg) || '未知错误'}`)
+        } else if (error.request) {
+          this.$message.error('网络连接失败，请检查网络连接')
+        } else {
+          this.$message.error('请求配置错误: ' + error.message)
+        }
+        this.workOrderDetailData = []
+      })
     },
 
     // 滚动到维修人员表格

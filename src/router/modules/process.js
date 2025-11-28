@@ -57,6 +57,12 @@ const processRouter = {
       component: () => import('@/views/process/list/consumable-management'),
       name: 'ConsumableManagement',
       meta: { title: '耗材管理', icon: 'box' }
+    },
+    {
+      path: 'worker-kpi',
+      component: () => import('@/views/process/list/worker-kpi'),
+      name: 'WorkerKPI',
+      meta: { title: '人员KPI考核', icon: 'user-solid' }
     }
   ]
 }

@@ -79,6 +79,8 @@
           </div>
         </div>
       </el-card>
+      <!-- 注释掉：库存总价值卡片 -->
+      <!--
       <el-card class="kpi-card" shadow="hover">
         <div class="kpi-content">
           <div class="kpi-icon cost">
@@ -90,6 +92,7 @@
           </div>
         </div>
       </el-card>
+      -->
     </div>
 
     <!-- 耗材列表 -->
@@ -154,16 +157,22 @@
             </el-tag>
           </template>
         </el-table-column>
+        <!-- 注释掉：单价列 -->
+        <!--
         <el-table-column prop="unitPrice" label="单价" width="100" align="right">
           <template slot-scope="scope">
             ¥ {{ scope.row.unitPrice }}
           </template>
         </el-table-column>
+        -->
+        <!-- 注释掉：库存价值列 -->
+        <!--
         <el-table-column label="库存价值" width="120" align="right">
           <template slot-scope="scope">
             ¥ {{ (scope.row.currentStock * scope.row.unitPrice).toFixed(2) }}
           </template>
         </el-table-column>
+        -->
         <el-table-column prop="location" label="存放位置" width="150" show-overflow-tooltip />
         <el-table-column prop="supplier" label="供应商" width="150" show-overflow-tooltip />
         <el-table-column prop="lastUpdate" label="最后更新" width="180" />
@@ -278,6 +287,8 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <!-- 注释掉：单价表单项 -->
+        <!--
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="单价" prop="unitPrice">
@@ -289,6 +300,14 @@
               />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="供应商" prop="supplier">
+              <el-input v-model="formData.supplier" placeholder="请输入供应商" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        -->
+        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="供应商" prop="supplier">
               <el-input v-model="formData.supplier" placeholder="请输入供应商" />
@@ -370,7 +389,8 @@ export default {
       totalInventory: 0,
       warningItems: 0,
       outOfStockItems: 0,
-      totalValue: 0,
+      // 注释掉：库存总价值
+      // totalValue: 0,
 
       // 对话框控制
       dialogVisible: false,
@@ -388,7 +408,8 @@ export default {
         unit: '个',
         currentStock: 0,
         minStock: 0,
-        unitPrice: 0,
+        // 注释掉：单价字段
+        // unitPrice: 0,
         supplier: '',
         location: '',
         remark: ''
@@ -501,7 +522,8 @@ export default {
           unit: '个',
           currentStock: 45,
           minStock: 10,
-          unitPrice: 25.5,
+          // 注释掉：单价字段
+          // unitPrice: 25.5,
           supplier: '深圳电子',
           location: 'A区-1排-3层',
           lastUpdate: '2024-01-15 10:30:00'
@@ -514,7 +536,8 @@ export default {
           unit: '个',
           currentStock: 8,
           minStock: 5,
-          unitPrice: 120.0,
+          // 注释掉：单价字段
+          // unitPrice: 120.0,
           supplier: '北京控制',
           location: 'B区-2排-1层',
           lastUpdate: '2024-01-14 16:20:00'
@@ -527,7 +550,8 @@ export default {
           unit: '米',
           currentStock: 25,
           minStock: 15,
-          unitPrice: 8.5,
+          // 注释掉：单价字段
+          // unitPrice: 8.5,
           supplier: '上海管道',
           location: 'C区-3排-2层',
           lastUpdate: '2024-01-13 09:15:00'
@@ -540,7 +564,8 @@ export default {
           unit: '个',
           currentStock: 2,
           minStock: 20,
-          unitPrice: 1.5,
+          // 注释掉：单价字段
+          // unitPrice: 1.5,
           supplier: '广州电气',
           location: 'A区-1排-1层',
           lastUpdate: '2024-01-12 14:45:00'
@@ -553,7 +578,8 @@ export default {
           unit: '包',
           currentStock: 15,
           minStock: 10,
-          unitPrice: 5.0,
+          // 注释掉：单价字段
+          // unitPrice: 5.0,
           supplier: '东莞工具',
           location: 'B区-1排-2层',
           lastUpdate: '2024-01-15 11:20:00'
@@ -570,9 +596,10 @@ export default {
       this.outOfStockItems = this.consumableData.filter(item =>
         item.currentStock === 0
       ).length
-      this.totalValue = this.consumableData.reduce((sum, item) =>
-        sum + (item.currentStock * item.unitPrice), 0
-      ).toFixed(2)
+      // 注释掉：计算库存总价值的逻辑
+      // this.totalValue = this.consumableData.reduce((sum, item) =>
+      //   sum + (item.currentStock * item.unitPrice), 0
+      // ).toFixed(2)
     },
 
     // 搜索和筛选
@@ -595,7 +622,8 @@ export default {
         unit: '个',
         currentStock: 0,
         minStock: 0,
-        unitPrice: 0,
+        // 注释掉：单价字段
+        // unitPrice: 0,
         supplier: '',
         location: '',
         remark: ''

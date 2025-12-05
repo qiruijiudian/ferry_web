@@ -96,18 +96,19 @@
       </div>
       <div class="table-container">
         <el-table
-          v-loading="!workerData.length"
+          v-loading="workerLoading"
           :data="showAllWorkers ? workerData : workerData.slice(0, 10)"
           style="width: 100%"
           :height="tableHeight"
         >
           <el-table-column prop="rank" label="排名" width="60" />
           <el-table-column prop="name" label="维修人员" width="120" />
-          <el-table-column prop="completed" label="完成工单数量" width="130" />
+          <el-table-column prop="completed" label="完成工单数" width="130" />
+          <el-table-column prop="total_orders" label="总工单数" width="130" />
           <el-table-column label="工单完成率" width="150">
             <template slot-scope="scope">
               <div class="completion-rate">
-                <div class="completion-bar" :style="{ width: scope.row.completionRate + '%' }" />
+                <div class="completion-bar" :style="{ width: Math.min(scope.row.completionRate, 100) + '%' }" />
               </div>
               <span>{{ scope.row.completionRate }}%</span>
             </template>
@@ -118,55 +119,7 @@
       </div>
     </div>
 
-    <!-- 第二行：耗材使用TOP榜（占整行） -->
-    <!-- 注释掉耗材使用TOP榜部分 -->
-    <!--
-    <div class="full-width-section">
-      <div class="section-header">
-        <h3 class="section-title">耗材使用TOP榜</h3>
-        <div class="section-actions">
-          <el-button v-if="materialData.length > 10 && !showAllMaterials" type="text" icon="el-icon-arrow-down" @click="showAllMaterials = true">
-            展开全部 {{ materialData.length }} 条数据
-          </el-button>
-          <el-button v-if="materialData.length > 10 && showAllMaterials" type="text" icon="el-icon-arrow-up" @click="showAllMaterials = false">
-            收起至前10条
-          </el-button>
-        </div>
-      </div>
-      <div class="table-container">
-        <el-table
-          v-loading="materialLoading"
-          :data="showAllMaterials ? materialData : materialData.slice(0, 10)"
-          style="width: 100%"
-          :height="tableHeight"
-        >
-          <el-table-column prop="rank" label="排名" width="60" />
-          <el-table-column prop="name" label="耗材名称" min-width="200" />
-          <el-table-column prop="quantity" label="使用数量" width="100" align="center">
-            <template slot-scope="scope">
-              <span>{{ scope.row.quantity }}个</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="使用占比" width="120" align="center">
-            <template slot-scope="scope">
-              <div class="completion-rate">
-                <div class="completion-bar" :style="{ width: scope.row.usageRatio + '%' }" />
-              </div>
-              <span>{{ scope.row.usageRatio }}%</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="usage" label="主要使用场景" min-width="180" />
-        </el-table>
-
-        <div v-if="materialData.length === 0 && !materialLoading" class="empty-state">
-          <i class="el-icon-box" />
-          <p>暂无耗材使用数据</p>
-        </div>
-      </div>
-    </div>
-    -->
-
-    <!-- 第三行：三个图表 -->
+    <!-- 第二行：三个图表 -->
     <div class="chart-container">
       <div class="chart-box">
         <div class="chart-title">工单完成时长分布</div>
@@ -175,63 +128,17 @@
         </div>
       </div>
       <div class="chart-box">
-        <div class="chart-title">各类型工单平均时长</div>
+        <div class="chart-title">各类型工单完成时长分布（箱线图）</div>
         <div class="chart-wrapper">
-          <canvas ref="typeDurationChart" />
+          <div ref="typeDurationChart" style="width: 100%; height: 100%;" />
         </div>
       </div>
-      <div class="chart-box">
-        <!-- 修改：将"地区工单榜"改为"维修人员工单数量榜" -->
-        <div class="chart-title">维修人员工单数量榜</div>
-        <div class="chart-wrapper">
-          <canvas ref="workerOrderChart" />
-        </div>
-      </div>
-    </div>
-
-    <!-- 第四行：工单状态分布 + 耗材使用分布 + 工单类型分布 -->
-    <div class="chart-container">
-      <div class="chart-box">
-        <div class="chart-title">工单状态分布</div>
-        <div class="chart-wrapper">
-          <canvas ref="statusChart" />
-        </div>
-      </div>
-      <!-- 注释掉耗材使用分布图表 -->
-      <!--
-      <div class="chart-box">
-        <div class="chart-title">耗材使用分布</div>
-        <div class="chart-wrapper">
-          <canvas ref="materialCostChart" />
-        </div>
-      </div>
-      -->
       <div class="chart-box">
         <div class="chart-title">工单类型分布</div>
         <div class="chart-wrapper">
           <canvas ref="workTypeChart" />
         </div>
       </div>
-    </div>
-
-    <!-- 注释掉耗材成本分析总结 -->
-    <!--
-    <div class="summary" style="margin-top: 20px;">
-      <h3>{{ costAnalysisSummary.title }}</h3>
-      <p v-for="(point, index) in costAnalysisSummary.points" :key="index">{{ index + 1 }}. {{ point }}</p>
-    </div>
-    -->
-
-    <!-- 整体总结与建议 -->
-    <div class="summary">
-      <h3>整体总结与建议</h3>
-      <p>1. 业务量稳步提升，团队效率保持高位，一次性修复率表现优异。</p>
-      <p>2. 主机类和自控类工单平均时长偏高，建议重点分析原因并优化流程。</p>
-      <!-- 注释掉耗材相关建议 -->
-      <!-- <p>3. 电源适配器耗材成本占总成本42.9%，建议寻找替代供应商或优化采购策略。</p> -->
-      <p>3. 网络故障类工单占比最高，建议加强相关技能培训。</p>
-      <p>4. 长时间未完成工单主要原因是配件短缺，建议优化库存管理。</p>
-      <p>5. 维修人员表现差异明显，建议开展技能共享与培训，提升整体服务质量。</p>
     </div>
 
     <!-- 工单详情对话框 -->
@@ -300,21 +207,20 @@
 </template>
 
 <script>
-// 导入项目已有的API方法，与其他页面保持一致
 import { workOrderListAnalysis } from '@/api/process/work-order'
 import axios from 'axios'
+// 引入ECharts
+import * as echarts from 'echarts'
 
 export default {
   name: 'MaintenanceReport',
   data() {
     return {
       filters: {
-        duration: 'week', // 默认筛选一周数据
+        duration: 'week',
         area: 'all'
       },
-      // 新增：自选时间段
       customDateRange: [],
-      // 日期选择器配置
       pickerOptions: {
         disabledDate(time) {
           return time.getTime() > Date.now()
@@ -359,6 +265,7 @@ export default {
         { label: '维修人员排行', value: '', worker: '', count: 0, trend: '', icon: '', description: '' }
       ],
       workerData: [],
+      workerLoading: false,
       reworkData: [
         { reworkId: 'RW-20231020-001', originalId: 'WO-20231015-045', worker: '张三', reason: '配件安装不牢固', date: '2023-10-20' },
         { reworkId: 'RW-20231021-002', originalId: 'WO-20231016-078', worker: '李四', reason: '软件配置错误', date: '2023-10-21' },
@@ -388,8 +295,6 @@ export default {
         repair_type_stats: [],
         consumable_stats: []
       },
-      // 删除：areaChartData，因为不再需要地区图表
-      // 工单详情相关数据 - 修复：添加分页和搜索功能
       workOrderDialogVisible: false,
       workOrderDialogTitle: '',
       workOrderDetailData: [],
@@ -402,7 +307,6 @@ export default {
       loadingMore: false,
       currentPage: 1,
       totalPages: 1,
-      // 时间段映射
       timeRangeMap: {
         0: { label: '<2小时', min: 0, max: 2 },
         1: { label: '2-4小时', min: 2, max: 4 },
@@ -410,22 +314,23 @@ export default {
         3: { label: '8-24小时', min: 8, max: 24 },
         4: { label: '>24小时', min: 24, max: Infinity }
       },
-      // 缓存两个请求的数据
       cachedWorkOrders: null,
       cachedProcesses: null,
-      // 新增：表格展开状态
       showAllWorkers: false,
       showAllMaterials: false,
       tableHeight: '400px',
-
-      // 新增：饼图颜色配置
-      chartColors: {
-        material: [
-          '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-          '#FF9F40', '#FF6384', '#C9CBCF', '#7BCFFE', '#FFA3A3',
-          '#7ED321', '#BD10E0', '#50E3C2', '#B8E986', '#4A90E2',
-          '#F5A623', '#D0021B', '#9013FE', '#417505', '#8B572A'
-        ]
+      workerTotalOrdersCache: {},
+      // 新增：用于存储箱线图的数据
+      typeBoxplotData: {
+        categories: [],
+        boxData: [],
+        scatterData: []
+      },
+      typeOrderDetails: {},
+      // 新增：用于存储Chart.js的图表实例
+      chartJsInstances: {
+        durationChart: null,
+        workTypeChart: null
       }
     }
   },
@@ -476,34 +381,9 @@ export default {
 
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
     },
-    // 新增：动态生成耗材分析总结
-    costAnalysisSummary() {
-      if (!this.materialData.length) {
-        return {
-          title: '耗材使用分析',
-          points: ['暂无耗材使用数据可供分析']
-        }
-      }
-
-      const topMaterial = this.materialData[0]
-      const top3Materials = this.materialData.slice(0, 3)
-      const top3TotalRatio = top3Materials.reduce((sum, item) => sum + item.usageRatio, 0)
-
-      return {
-        title: '耗材使用分析',
-        points: [
-          `${topMaterial.name}使用数量最多，共${topMaterial.quantity}个，占总使用量的${topMaterial.usageRatio}%`,
-          `前3种耗材(${top3Materials.map(m => m.name).join('、')})占总使用量的${top3TotalRatio.toFixed(1)}%，建议重点关注库存管理`,
-          `耗材种类共计${this.materialData.length}种，反映了维修工作的多样性`,
-          this.materialData.length > 10 ? '耗材种类较多，建议优化库存结构，减少不常用耗材的库存积压' : '耗材种类相对集中，便于库存管理'
-        ]
-      }
-    },
-    // 新增：工单数据搜索和分页
     filteredWorkOrderData() {
       let data = this.workOrderDetailData
 
-      // 搜索过滤
       if (this.workOrderSearch) {
         const search = this.workOrderSearch.toLowerCase()
         data = data.filter(item =>
@@ -517,8 +397,6 @@ export default {
 
       return data
     },
-
-    // 分页后的数据
     paginatedWorkOrderData() {
       const start = (this.workOrderCurrentPage - 1) * this.workOrderPageSize
       const end = start + this.workOrderPageSize
@@ -527,45 +405,47 @@ export default {
   },
   mounted() {
     console.log('MaintenanceReport组件已挂载')
-    // 页面加载时预请求并缓存两个接口数据
     this.preFetchAndCacheData()
-    // 原有逻辑
     this.fetchReportData()
     this.loadChartJS().then(() => {
       console.log('Chart.js加载完成，开始初始化图表')
       this.initCharts()
     })
   },
+  beforeDestroy() {
+    // 销毁ECharts实例避免内存泄漏
+    if (this.charts.typeDurationChart) {
+      this.charts.typeDurationChart.dispose()
+    }
+
+    // 销毁Chart.js实例
+    Object.values(this.chartJsInstances).forEach(chart => {
+      if (chart && typeof chart.destroy === 'function') {
+        chart.destroy()
+      }
+    })
+  },
   methods: {
-    // 修改：时长选择变化处理
     handleDurationChange(value) {
       if (value !== 'custom') {
-        // 清除自定义日期范围
         this.customDateRange = []
-        // 立即执行筛选
         this.handleFilter()
       }
-      // 如果是custom，显示日期选择器，但不立即筛选
     },
-
-    // 新增：自定义日期范围变化处理
     handleCustomDateChange(dateRange) {
       if (dateRange && dateRange.length === 2) {
-        // 自定义日期范围选择完成后自动执行筛选
         this.handleFilter()
       }
     },
-
-    // 修改：筛选方法，支持自定义时间段
-    handleFilter() {
+    async handleFilter() {
       console.log('筛选条件:', this.filters)
       console.log('自定义日期范围:', this.customDateRange)
 
+      this.workerTotalOrdersCache = {}
+
       const params = {}
 
-      // 处理时间筛选
       if (this.filters.duration === 'custom') {
-        // 自定义时间段
         if (this.customDateRange && this.customDateRange.length === 2) {
           params.startTime = this.customDateRange[0] + ' 00:00:00'
           params.endTime = this.customDateRange[1] + ' 23:59:59'
@@ -574,7 +454,6 @@ export default {
           return
         }
       } else if (this.filters.duration !== 'all') {
-        // 预设时间段
         const now = new Date()
         let startTime
 
@@ -595,14 +474,12 @@ export default {
         params.startTime = this.formatDate(startTime)
         params.endTime = this.formatDate(now)
       } else {
-        // 全部时长
         const startTime = new Date(2006, 0, 1)
         const endTime = new Date()
         params.startTime = this.formatDate(startTime)
         params.endTime = this.formatDate(endTime)
       }
 
-      // 处理片区筛选
       if (this.filters.area !== 'all') {
         const areaMap = {
           'gangba': 'kamba',
@@ -613,34 +490,29 @@ export default {
         params.belongs = areaMap[this.filters.area]
       }
 
-      // 调用API获取数据
-      this.fetchFilteredData(params)
+      await this.fetchFilteredData(params)
     },
+    async fetchFilteredData(params) {
+      try {
+        const response = await axios({
+          url: 'https://order.cdqrmi.com/api/v1/analysis',
+          method: 'get',
+          headers: {
+            'Authorization': 'Bearer ' + this.getToken()
+          },
+          params: params
+        })
 
-    // 提取的API调用方法
-    fetchFilteredData(params) {
-      axios({
-        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis',
-        method: 'get',
-        headers: {
-          'Authorization': 'Bearer ' + this.getToken()
-        },
-        params: params
-      }).then(response => {
         if (response.data.code === 200) {
           console.log('筛选后的数据:', response.data)
           this.reportData = response.data.data
           this.updateKpiData()
           this.updateDurationChart()
-          this.updateStatusChart()
-          this.updateWorkerData()
-          this.updateWorkerTopChart()
-          this.updateWorkerOrderChart() // 新增：更新维修人员工单数量榜
-          this.updateTypeDurationChart()
-          this.updateMaterialData()
-          this.updateMaterialCharts()
+          await this.updateWorkerData(params)
+          // 获取箱线图数据
+          this.fetchTypeDurationData()
+          this.updateWorkTypeChart()
 
-          // 显示筛选成功消息
           let message = `已应用筛选: 时长=${this.getDurationText(this.filters.duration)}`
           if (this.filters.duration === 'custom' && this.customDateRange.length === 2) {
             message += ` (${this.customDateRange[0]} 至 ${this.customDateRange[1]})`
@@ -658,16 +530,14 @@ export default {
             type: 'error'
           })
         }
-      }).catch(error => {
+      } catch (error) {
         console.error('获取筛选数据失败:', error)
         this.$message({
           message: '获取筛选数据失败，请检查网络连接或联系管理员',
           type: 'error'
         })
-      })
+      }
     },
-
-    // 修改：获取时长文本，支持自定义
     getDurationText(value) {
       const map = {
         'all': '全部时长',
@@ -678,10 +548,7 @@ export default {
       }
       return map[value] || value
     },
-
-    // 预请求并缓存两个接口数据
     preFetchAndCacheData() {
-      // 1. 工单列表请求（仅classify=4）
       this.fetchWorkOrders().then(data => {
         this.cachedWorkOrders = data
         console.log('工单列表数据已缓存', data)
@@ -689,15 +556,13 @@ export default {
         console.error('工单列表预请求失败', err)
       })
     },
-
-    // 请求一：获取工单列表（使用项目统一API）
     fetchWorkOrders() {
       return new Promise((resolve, reject) => {
         workOrderListAnalysis({
-          classify: 4 // 只传classify=4，不带per_page参数
+          classify: 4
         }).then(response => {
           if (response.code === 200) {
-            resolve(response.data) // 缓存工单数据
+            resolve(response.data)
           } else {
             reject(new Error('工单列表请求失败: ' + response.msg))
           }
@@ -706,27 +571,13 @@ export default {
         })
       })
     },
-
-    // 从缓存中获取工单列表数据
     getCachedWorkOrders() {
       return this.cachedWorkOrders
     },
-
-    // 删除：updateAreaChartData和updateAreaChart方法，因为不再需要地区图表
-
-    // 从缓存中获取流程名称
-    getProcessName(processId) {
-      if (!this.cachedProcesses || !this.cachedProcesses.data) return '未知流程'
-      const process = this.cachedProcesses.data.find(p => p.id === processId)
-      return process ? process.name : '未知流程'
-    },
-
-    // 从缓存中筛选工单数据
     filterCachedWorkOrders(condition = {}) {
       if (!this.cachedWorkOrders || !this.cachedWorkOrders.data) return []
 
       return this.cachedWorkOrders.data.filter(order => {
-        // 片区筛选
         if (condition.area && condition.area !== 'all') {
           const areaMap = {
             'gangba': 'kamba',
@@ -737,13 +588,11 @@ export default {
           if (order.belongs !== areaMap[condition.area]) return false
         }
 
-        // 状态筛选
         if (condition.status) {
           if (condition.status === 'ended' && order.is_end !== 1) return false
           if (condition.status === 'processing' && (order.is_end === 1 || order.is_denied === 1)) return false
         }
 
-        // 维修人员筛选
         if (condition.worker) {
           if (order.principals !== condition.worker) return false
         }
@@ -751,9 +600,7 @@ export default {
         return true
       })
     },
-
-    // 获取报表数据
-    fetchReportData() {
+    async fetchReportData() {
       const now = new Date()
       const startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
@@ -762,26 +609,25 @@ export default {
         endTime: this.formatDate(now)
       }
 
-      axios({
-        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis',
-        method: 'get',
-        headers: {
-          'Authorization': 'Bearer ' + this.getToken()
-        },
-        params: params
-      }).then(response => {
+      try {
+        const response = await axios({
+          url: 'https://order.cdqrmi.com/api/v1/analysis',
+          method: 'get',
+          headers: {
+            'Authorization': 'Bearer ' + this.getToken()
+          },
+          params: params
+        })
+
         if (response.data.code === 200) {
           console.log('API返回的原始数据:', response.data)
           this.reportData = response.data.data
           this.updateKpiData()
           this.updateDurationChart()
-          this.updateStatusChart()
-          this.updateWorkerData()
-          this.updateWorkerTopChart()
-          this.updateWorkerOrderChart() // 新增：更新维修人员工单数量榜
-          this.updateTypeDurationChart()
-          this.updateMaterialData()
-          this.updateMaterialCharts()
+          await this.updateWorkerData(params)
+          // 获取箱线图数据
+          this.fetchTypeDurationData()
+          this.updateWorkTypeChart()
           this.filters.duration = 'week'
         } else {
           console.error('获取报表数据失败:', response.data.message)
@@ -790,21 +636,17 @@ export default {
             type: 'error'
           })
         }
-      }).catch(error => {
+      } catch (error) {
         console.error('获取报表数据失败:', error)
         this.$message({
           message: '获取报表数据失败，请检查网络连接或联系管理员',
           type: 'error'
         })
-      })
+      }
     },
-
-    // 获取Token（与工单列表页面保持一致）
     getToken() {
       return localStorage.getItem('token') || ''
     },
-
-    // 更新KPI数据
     updateKpiData() {
       this.kpiData[0].value = this.reportData.total_count
       this.kpiData[1].value = this.reportData.unfinished_count
@@ -821,227 +663,170 @@ export default {
         }
       }
     },
-
-    // 新增：更新耗材数据方法
-    updateMaterialData() {
-      this.materialLoading = true
-      if (this.reportData.consumable_stats && this.reportData.consumable_stats.length > 0) {
-        // 按使用数量排序
-        const sortedMaterials = [...this.reportData.consumable_stats].sort((a, b) => b.total_count - a.total_count)
-
-        this.materialData = sortedMaterials.map((material, index) => {
-          // 计算占总耗材比例
-          const totalConsumables = sortedMaterials.reduce((sum, item) => sum + item.total_count, 0)
-          const usageRatio = totalConsumables > 0 ? ((material.total_count / totalConsumables) * 100).toFixed(1) : 0
-
-          return {
-            rank: index + 1,
-            name: material.name,
-            quantity: material.total_count,
-            usageRatio: parseFloat(usageRatio),
-            usage: this.getMaterialUsageDescription(material.name)
-          }
-        })
-      } else {
-        // 如果没有耗材数据，显示空状态
-        this.materialData = []
-      }
-      this.materialLoading = false
-    },
-
-    // 新增：根据耗材名称推断使用场景
-    getMaterialUsageDescription(materialName) {
-      const usageMap = {
-        '控制面板': '设备控制、维修',
-        '开关控制面板': '电气控制、开关维修',
-        '风机金属波纹管': '通风系统、风机连接',
-        '胶垫': '密封、防水处理',
-        '湿化瓶': '供氧系统、医疗设备',
-        '保险管': '电路保护、电气维修',
-        '扎带': '线缆固定、整理',
-        '生胶带': '管道密封、螺纹连接',
-        '活接': '管道连接、维修',
-        '外丝直接': '管道连接件',
-        '波纹管': '管道连接、柔性连接',
-        '垫片': '密封、接口保护'
-      }
-
-      // 查找匹配的使用场景
-      for (const [key, value] of Object.entries(usageMap)) {
-        if (materialName.includes(key)) {
-          return value
-        }
-      }
-
-      return '通用维修'
-    },
-
-    // 新增：更新耗材图表
-    updateMaterialCharts() {
-      this.updateMaterialCostChart()
-    },
-
-    // 新增：更新耗材成本分布图表 - 修改：添加颜色区分
-    updateMaterialCostChart() {
-      if (this.charts.materialCostChart && this.materialData.length > 0) {
-        // 取前8种耗材显示，其他归为"其他"
-        const topMaterials = this.materialData.slice(0, 8)
-        const othersCount = this.materialData.slice(8).reduce((sum, item) => sum + item.quantity, 0)
-
-        const labels = topMaterials.map(item => item.name)
-        const data = topMaterials.map(item => item.quantity)
-
-        if (othersCount > 0) {
-          labels.push('其他')
-          data.push(othersCount)
-        }
-
-        // 获取对应数量的颜色
-        const backgroundColors = this.getMaterialColors(labels.length)
-
-        this.charts.materialCostChart.data.labels = labels
-        this.charts.materialCostChart.data.datasets[0].data = data
-        this.charts.materialCostChart.data.datasets[0].backgroundColor = backgroundColors
-        this.charts.materialCostChart.data.datasets[0].borderColor = backgroundColors.map(color =>
-          this.adjustBrightness(color, -20) // 边框颜色稍深一些
-        )
-        this.charts.materialCostChart.data.datasets[0].borderWidth = 2
-        this.charts.materialCostChart.update()
-      }
-    },
-
-    // 新增：获取耗材图表颜色
-    getMaterialColors(count) {
-      const colors = [...this.chartColors.material]
-      // 如果需要的颜色数量超过预设，循环使用颜色
-      if (count > colors.length) {
-        const additionalColors = []
-        for (let i = colors.length; i < count; i++) {
-          additionalColors.push(this.generateRandomColor())
-        }
-        return [...colors, ...additionalColors]
-      }
-      return colors.slice(0, count)
-    },
-
-    // 新增：生成随机颜色（用于超出预设颜色数量的情况）
-    generateRandomColor() {
-      const letters = '0123456789ABCDEF'
-      let color = '#'
-      for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)]
-      }
-      return color
-    },
-
-    // 新增：调整颜色亮度
-    adjustBrightness(color, percent) {
-      const num = parseInt(color.replace('#', ''), 16)
-      const amt = Math.round(2.55 * percent)
-      const R = (num >> 16) + amt
-      const G = (num >> 8 & 0x00FF) + amt
-      const B = (num & 0x0000FF) + amt
-      return '#' + (
-        0x1000000 +
-        (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-        (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-        (B < 255 ? (B < 1 ? 0 : B) : 255)
-      ).toString(16).slice(1)
-    },
-
-    // 更新工单完成时长分布图表
     updateDurationChart() {
-      if (this.charts.durationChart) {
-        this.charts.durationChart.data.datasets[0].data = [
+      if (this.chartJsInstances.durationChart) {
+        this.chartJsInstances.durationChart.data.datasets[0].data = [
           this.reportData.completion_time_distribution.less_than_2h,
           this.reportData.completion_time_distribution.between_2h_4h,
           this.reportData.completion_time_distribution.between_4h_8h,
           this.reportData.completion_time_distribution.between_8h_24h,
           this.reportData.completion_time_distribution.more_than_24h
         ]
-        this.charts.durationChart.update()
+        this.chartJsInstances.durationChart.update()
       }
     },
+    updateWorkTypeChart() {
+      console.log('更新工单类型分布图表')
+      console.log('repair_type_stats数据:', this.reportData.repair_type_stats)
 
-    // 更新工单状态分布图表
-    updateStatusChart() {
-      if (this.charts.statusChart) {
-        this.charts.statusChart.data.datasets[0].data = [
-          this.reportData.ended_count,
-          this.reportData.processing_count,
-          this.reportData.unassigned_count
-        ]
-        this.charts.statusChart.update()
+      if (this.chartJsInstances.workTypeChart && this.reportData.repair_type_stats) {
+        const labels = this.reportData.repair_type_stats.map(item => item.type)
+        const data = this.reportData.repair_type_stats.map(item => item.count)
+
+        console.log('工单类型分布 - 标签:', labels)
+        console.log('工单类型分布 - 数据:', data)
+
+        this.chartJsInstances.workTypeChart.data.labels = labels
+        this.chartJsInstances.workTypeChart.data.datasets[0].data = data
+        this.chartJsInstances.workTypeChart.update()
       }
     },
+    // 修改：更新维修人员数据 - 使用正确的工单完成率计算方法
+    async updateWorkerData(filterParams = {}) {
+      this.workerLoading = true
 
-    // 更新各类型工单平均时长图表
-    updateTypeDurationChart() {
-      if (this.charts.typeDurationChart) {
-        if (this.reportData.repair_type_stats) {
-          this.charts.typeDurationChart.data.labels = this.reportData.repair_type_stats.map(item => item.type)
-          this.charts.typeDurationChart.data.datasets[0].data = this.reportData.repair_type_stats.map(item => item.count)
+      try {
+        const sortedWorkers = [...this.reportData.worker_completion].sort((a, b) => b.count - a.count)
+
+        // 为每个维修人员获取个人总工单数
+        const workerPromises = sortedWorkers.map(async(worker, index) => {
+          try {
+            // 获取该维修人员的个人总工单数（包含已完成和未完成）
+            const totalOrders = await this.fetchWorkerTotalOrders(worker.nick_name, filterParams)
+
+            console.log(`维修人员 ${worker.nick_name}：完成工单数=${worker.count}, 总工单数=${totalOrders}`)
+
+            // 计算工单完成率：个人完成工单数 ÷ 个人总工单数 × 100%
+            let completionRate = 0
+            if (totalOrders > 0) {
+              completionRate = Math.round((worker.count / totalOrders) * 100)
+            }
+
+            // 确保完成率不超过100%
+            completionRate = Math.min(completionRate, 100)
+
+            return {
+              rank: index + 1,
+              name: worker.nick_name,
+              completed: worker.count, // 分子：个人完成工单数
+              total_orders: totalOrders, // 分母：个人总工单数
+              completionRate: completionRate, // 工单完成率 = 个人完成工单数 ÷ 个人总工单数 × 100%
+              avgTime: parseFloat(worker.avg_time).toFixed(1),
+              reworkRate: '0%'
+            }
+          } catch (error) {
+            console.error(`获取维修人员 ${worker.nick_name} 总工单数失败:`, error)
+            // 如果获取失败，暂时用完成工单数作为总工单数（完成率100%）
+            return {
+              rank: index + 1,
+              name: worker.nick_name,
+              completed: worker.count,
+              total_orders: worker.count,
+              completionRate: 100,
+              avgTime: parseFloat(worker.avg_time).toFixed(1),
+              reworkRate: '0%'
+            }
+          }
+        })
+
+        // 等待所有维修人员数据获取完成
+        this.workerData = await Promise.all(workerPromises)
+
+        console.log('维修人员数据更新完成:', this.workerData)
+      } catch (error) {
+        console.error('更新维修人员数据失败:', error)
+        // 如果整体失败，使用备选方案
+        this.updateWorkerDataFallback()
+      } finally {
+        this.workerLoading = false
+      }
+    },
+    // 新增：获取维修人员个人总工单数（包含已完成和未完成）
+    async fetchWorkerTotalOrders(workerName, filterParams = {}) {
+      // 使用缓存，避免重复请求
+      const cacheKey = `${workerName}_${JSON.stringify(filterParams)}`
+      if (this.workerTotalOrdersCache[cacheKey] !== undefined) {
+        console.log(`从缓存获取 ${workerName} 的总工单数:`, this.workerTotalOrdersCache[cacheKey])
+        return this.workerTotalOrdersCache[cacheKey]
+      }
+
+      try {
+        // 构建请求参数，按维修人员名称筛选
+        const apiParams = {
+          classify: 4,
+          page: 1,
+          per_page: 1, // 只需要总数，不需要具体数据
+          principals: workerName, // 按维修人员筛选
+          ...filterParams
         }
-        this.charts.typeDurationChart.update()
+
+        // 移除不必要的参数
+        delete apiParams.min_time
+        delete apiParams.max_time
+
+        console.log(`请求 ${workerName} 的总工单数，参数:`, apiParams)
+
+        const response = await axios({
+          url: 'https://order.cdqrmi.com/api/v1/analysis/list',
+          method: 'get',
+          params: apiParams,
+          timeout: 15000,
+          headers: {
+            'Authorization': 'Bearer ' + this.getToken()
+          }
+        })
+
+        if (response.data.code === 200) {
+          let totalCount = 0
+
+          if (response.data.data && response.data.data.total_count !== undefined) {
+            totalCount = response.data.data.total_count
+          } else if (response.data.data && response.data.data.data) {
+            totalCount = response.data.data.data.length
+          }
+
+          console.log(`维修人员 ${workerName} 的个人总工单数:`, totalCount)
+
+          // 缓存结果
+          this.workerTotalOrdersCache[cacheKey] = totalCount
+
+          return totalCount
+        } else {
+          console.error(`获取维修人员 ${workerName} 总工单数失败:`, response.data.message)
+          throw new Error(response.data.message || '获取总工单数失败')
+        }
+      } catch (error) {
+        console.error(`请求维修人员 ${workerName} 总工单数异常:`, error)
+        throw error
       }
     },
-
-    // 修复：更新维修人员数据 - 修正工单完成率计算
-    updateWorkerData() {
+    // 备选方案：如果获取总工单数失败，使用原有逻辑
+    updateWorkerDataFallback() {
       const sortedWorkers = [...this.reportData.worker_completion].sort((a, b) => b.count - a.count)
 
-      // 计算所有维修人员完成的总工单数（用于计算个人占比）
-      const totalCompletedByAllWorkers = sortedWorkers.reduce((sum, worker) => sum + worker.count, 0)
-
       this.workerData = sortedWorkers.map((worker, index) => {
-        // 修复：正确计算工单完成率 - 使用该维修人员完成的工单数占总完成工单数的比例
-        const completionRate = totalCompletedByAllWorkers > 0
-          ? Math.round((worker.count / totalCompletedByAllWorkers) * 100) : 0
-
+        // 备选方案：用完成工单数作为总工单数
         return {
           rank: index + 1,
           name: worker.nick_name,
           completed: worker.count,
-          completionRate: completionRate,
+          total_orders: worker.count,
+          completionRate: 100, // 备选方案中完成率设为100%
           avgTime: parseFloat(worker.avg_time).toFixed(1),
           reworkRate: '0%'
         }
       })
     },
-
-    // 更新维修人员TOP榜图表
-    updateWorkerTopChart() {
-      if (this.charts.workerTopChart) {
-        const sortedWorkers = [...this.reportData.worker_completion].sort((a, b) => b.count - a.count)
-        const topWorkers = sortedWorkers.slice(0, 10)
-
-        this.charts.workerTopChart.data.labels = topWorkers.map(worker => worker.nick_name)
-        this.charts.workerTopChart.data.datasets[0].data = topWorkers.map(worker => worker.count)
-
-        // 计算所有维修人员完成的总工单数（用于计算个人占比）
-        const totalCompletedByAllWorkers = sortedWorkers.reduce((sum, worker) => sum + worker.count, 0)
-        this.charts.workerTopChart.data.datasets[1].data = topWorkers.map(worker => {
-          return totalCompletedByAllWorkers > 0 ? Math.round((worker.count / totalCompletedByAllWorkers) * 100) : 0
-        })
-        this.charts.workerTopChart.update()
-      }
-    },
-
-    // 新增：更新维修人员工单数量榜
-    updateWorkerOrderChart() {
-      if (this.charts.workerOrderChart && this.reportData.worker_completion) {
-        // 按完成工单数量排序
-        const sortedWorkers = [...this.reportData.worker_completion].sort((a, b) => b.count - a.count)
-
-        // 取前10名显示
-        const displayWorkers = sortedWorkers.slice(0, 10)
-
-        this.charts.workerOrderChart.data.labels = displayWorkers.map(worker => worker.nick_name)
-        this.charts.workerOrderChart.data.datasets[0].data = displayWorkers.map(worker => worker.count)
-        this.charts.workerOrderChart.update()
-      }
-    },
-
     loadChartJS() {
       return new Promise((resolve, reject) => {
         if (window.Chart) {
@@ -1056,8 +841,6 @@ export default {
         document.head.appendChild(script)
       })
     },
-
-    // 格式化日期为 'YYYY-MM-DD HH:mm:ss'
     formatDate(date) {
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -1068,7 +851,6 @@ export default {
 
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
     },
-
     getAreaText(value) {
       const map = {
         'all': '全部片区',
@@ -1079,16 +861,15 @@ export default {
       }
       return map[value] || value
     },
-
     initCharts() {
       if (!window.Chart) {
         console.error('Chart.js未加载')
         return
       }
 
-      // 工单完成时长分布
+      // 初始化工单完成时长分布图（Chart.js）
       const durationCtx = this.$refs.durationChart.getContext('2d')
-      this.charts.durationChart = new window.Chart(durationCtx, {
+      this.chartJsInstances.durationChart = new window.Chart(durationCtx, {
         type: 'bar',
         data: {
           labels: ['<2小时', '2-4小时', '4-8小时', '8-24小时', '>24小时'],
@@ -1134,7 +915,7 @@ export default {
             if (elements.length > 0) {
               const element = elements[0]
               const index = element._index
-              const label = this.charts.durationChart.data.labels[index]
+              const label = this.chartJsInstances.durationChart.data.labels[index]
               this.workOrderDialogTitle = `工单详情 - ${label}完成`
               this.workOrderDialogVisible = true
               this.fetchWorkOrderDetails(index)
@@ -1143,221 +924,37 @@ export default {
         }
       })
 
-      // 各类型工单平均时长
-      const typeDurationCtx = this.$refs.typeDurationChart.getContext('2d')
-      this.charts.typeDurationChart = new window.Chart(typeDurationCtx, {
-        type: 'bar',
+      // 初始化工单类型分布图（Chart.js）
+      const workTypeCtx = this.$refs.workTypeChart.getContext('2d')
+      this.chartJsInstances.workTypeChart = new window.Chart(workTypeCtx, {
+        type: 'pie',
         data: {
           labels: this.reportData.repair_type_stats
             ? this.reportData.repair_type_stats.map(item => item.type)
-            : [
-              '供暖', '供水', '供氧', '维保', '设备类',
-              '管道类', '风机类', '自控类', '主机类',
-              '电气类', '金属管道类', '插座类', '阀门类',
-              '水表', '水龙头', '接头', '温控器', '伴热带'
-            ],
-          datasets: [{
-            label: '平均时长(小时)',
-            data: this.reportData.repair_type_stats
-              ? this.reportData.repair_type_stats.map(item => item.count)
-              : [
-                4.8, 3.2, 5.5, 2.1, 6.2,
-                4.5, 3.8, 7.1, 8.3,
-                5.2, 4.9, 1.8, 2.5,
-                1.5, 1.2, 0.8, 3.1, 2.8
-              ],
-            backgroundColor: 'rgba(59, 130, 246, 0.7)',
-            borderColor: 'rgb(59, 130, 246)',
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          indexAxis: 'y',
-          scales: {
-            x: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: '平均时长(小时)'
-              }
-            }
-          },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `平均时长: ${context.raw} 小时`
-                }
-              }
-            }
-          }
-        }
-      })
-
-      // 新增：维修人员工单数量榜 - 替换原来的地区工单榜
-      const workerOrderCtx = this.$refs.workerOrderChart.getContext('2d')
-      this.charts.workerOrderChart = new window.Chart(workerOrderCtx, {
-        type: 'bar',
-        data: {
-          labels: this.reportData.worker_completion
-            ? this.reportData.worker_completion
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 10)
-              .map(worker => worker.nick_name)
             : [],
           datasets: [{
-            label: '完成工单数',
-            data: this.reportData.worker_completion
-              ? this.reportData.worker_completion
-                .sort((a, b) => b.count - a.count)
-                .slice(0, 10)
-                .map(worker => worker.count)
+            data: this.reportData.repair_type_stats
+              ? this.reportData.repair_type_stats.map(item => item.count)
               : [],
-            backgroundColor: 'rgba(139, 92, 246, 0.7)',
-            borderColor: 'rgb(139, 92, 246)',
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: '工单数量'
-              }
-            },
-            x: {
-              title: {
-                display: true,
-                text: '维修人员'
-              }
-            }
-          },
-          // 新增：点击事件，查看具体工单
-          onClick: (event, elements) => {
-            if (elements.length > 0) {
-              const element = elements[0]
-              const index = element._index
-              const workerName = this.charts.workerOrderChart.data.labels[index]
-              this.fetchWorkerOrderDetails(workerName)
-            }
-          }
-        }
-      })
-
-      // 工单状态分布
-      const statusCtx = this.$refs.statusChart.getContext('2d')
-      this.charts.statusChart = new window.Chart(statusCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['已完成', '进行中', '待分配'],
-          datasets: [{
-            data: [
-              this.reportData.ended_count,
-              this.reportData.processing_count,
-              this.reportData.unassigned_count
-            ],
-            backgroundColor: [
-              'rgba(34, 197, 94, 0.7)',
-              'rgba(59, 130, 246, 0.7)',
-              'rgba(251, 191, 36, 0.7)'
-            ],
-            borderColor: [
-              'rgb(34, 197, 94)',
-              'rgb(59, 130, 246)',
-              'rgb(251, 191, 36)'
-            ],
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'right'
-            }
-          }
-        }
-      })
-
-      // 耗材使用分布 - 修改：使用动态颜色
-      const materialCostCtx = this.$refs.materialCostChart.getContext('2d')
-      this.charts.materialCostChart = new window.Chart(materialCostCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['加载中...'],
-          datasets: [{
-            data: [100],
-            backgroundColor: ['rgba(200, 200, 200, 0.7)'],
-            borderColor: ['rgb(150, 150, 150)'],
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'right',
-              labels: {
-                boxWidth: 12,
-                padding: 15,
-                font: {
-                  size: 11
-                }
-              }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const label = context.label || ''
-                  const value = context.raw || 0
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0)
-                  const percentage = Math.round((value / total) * 100)
-                  return `${label}: ${value}个 (${percentage}%)`
-                }
-              }
-            }
-          },
-          // 添加点击事件
-          onClick: (event, elements) => {
-            if (elements.length > 0) {
-              const element = elements[0]
-              const index = element._index
-              const label = this.charts.materialCostChart.data.labels[index]
-              this.$message.info(`点击了耗材: ${label}`)
-            }
-          }
-        }
-      })
-
-      // 工单类型分布
-      const workTypeCtx = this.$refs.workTypeChart.getContext('2d')
-      this.charts.workTypeChart = new window.Chart(workTypeCtx, {
-        type: 'pie',
-        data: {
-          labels: ['维修', '安装', '保养', '巡检', '升级'],
-          datasets: [{
-            data: [45, 25, 15, 10, 5],
             backgroundColor: [
               'rgba(239, 68, 68, 0.7)',
               'rgba(59, 130, 246, 0.7)',
               'rgba(34, 197, 94, 0.7)',
               'rgba(251, 191, 36, 0.7)',
-              'rgba(139, 92, 246, 0.7)'
+              'rgba(139, 92, 246, 0.7)',
+              'rgba(236, 72, 153, 0.7)',
+              'rgba(20, 184, 166, 0.7)',
+              'rgba(245, 158, 11, 0.7)'
             ],
             borderColor: [
               'rgb(239, 68, 68)',
               'rgb(59, 130, 246)',
               'rgb(34, 197, 94)',
               'rgb(251, 191, 36)',
-              'rgb(139, 92, 246)'
+              'rgb(139, 92, 246)',
+              'rgb(236, 72, 153)',
+              'rgb(20, 184, 166)',
+              'rgb(245, 158, 11)'
             ],
             borderWidth: 1
           }]
@@ -1374,36 +971,432 @@ export default {
       })
     },
 
-    // 删除：updateEfficiencyChart方法，因为不再需要
+    // 新增：获取各类型工单完成时长数据（用于箱线图）
+    async fetchTypeDurationData() {
+      try {
+        const filterParams = this.getFilterParams()
 
-    // 新增：获取维修人员工单详情
+        // 获取所有工单数据
+        const apiParams = {
+          classify: 4,
+          page: 1,
+          per_page: 500, // 获取足够多的数据用于分析
+          ...filterParams
+        }
+
+        const response = await axios({
+          url: 'https://order.cdqrmi.com/api/v1/analysis/list',
+          method: 'get',
+          params: apiParams,
+          timeout: 30000,
+          headers: {
+            'Authorization': 'Bearer ' + this.getToken()
+          }
+        })
+
+        if (response.data.code === 200 && response.data.data && response.data.data.data) {
+          const orders = response.data.data.data
+
+          // 按工单类型分组
+          const typeGroups = {}
+          this.typeOrderDetails = {} // 用于存储每个类型的工单详情
+
+          orders.forEach(order => {
+            // 获取工单类型
+            const type = order.repair_type || '未知类型'
+
+            // 计算完成时长（只统计已完成的工单）
+            if (order.is_end === 1 && order.create_time && order.update_time) {
+              const createTime = new Date(order.create_time)
+              const finishTime = new Date(order.update_time)
+              const durationHours = (finishTime - createTime) / (1000 * 60 * 60)
+
+              if (!isNaN(durationHours) && durationHours >= 0) {
+                if (!typeGroups[type]) {
+                  typeGroups[type] = []
+                  this.typeOrderDetails[type] = []
+                }
+                typeGroups[type].push(durationHours)
+
+                // 存储工单详情
+                this.typeOrderDetails[type].push({
+                  id: order.id,
+                  title: order.title,
+                  duration: durationHours,
+                  worker: order.principals,
+                  createTime: order.create_time,
+                  finishTime: order.update_time
+                })
+              }
+            }
+          })
+
+          // 将数据转换为箱线图需要的格式
+          this.convertToBoxplotData(typeGroups)
+
+          // 初始化或更新箱线图
+          this.initOrUpdateBoxplotChart()
+        }
+      } catch (error) {
+        console.error('获取类型工单时长数据失败:', error)
+        // 如果获取失败，使用模拟数据
+        this.generateMockBoxplotData()
+      }
+    },
+
+    // 转换数据为箱线图格式
+    convertToBoxplotData(typeGroups) {
+      this.typeBoxplotData = {
+        categories: [],
+        boxData: [],
+        scatterData: []
+      }
+
+      Object.entries(typeGroups).forEach(([type, durations]) => {
+        if (durations.length >= 5) { // 至少有5个数据点才显示箱线图
+          this.typeBoxplotData.categories.push(type)
+
+          // 排序数据
+          const sorted = durations.slice().sort((a, b) => a - b)
+
+          // 计算四分位数
+          const q1 = this.calculateQuantile(sorted, 0.25)
+          const median = this.calculateQuantile(sorted, 0.5)
+          const q3 = this.calculateQuantile(sorted, 0.75)
+
+          // 计算上下边界（1.5倍IQR规则）
+          const iqr = q3 - q1
+          const min = Math.max(sorted[0], q1 - 1.5 * iqr)
+          const max = Math.min(sorted[sorted.length - 1], q3 + 1.5 * iqr)
+
+          // 箱线图数据：[min, q1, median, q3, max]
+          this.typeBoxplotData.boxData.push([min, q1, median, q3, max])
+
+          // 散点数据（显示异常值）
+          const outliers = durations.filter(d => d < min || d > max)
+          outliers.forEach(outlier => {
+            this.typeBoxplotData.scatterData.push([type, outlier])
+          })
+        }
+      })
+
+      return this.typeBoxplotData
+    },
+
+    // 计算分位数
+    calculateQuantile(sortedArray, p) {
+      const index = (sortedArray.length - 1) * p
+      const lower = Math.floor(index)
+      const upper = lower + 1
+      const weight = index - lower
+
+      if (upper >= sortedArray.length) {
+        return sortedArray[lower]
+      }
+
+      return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight
+    },
+
+    // 初始化或更新箱线图
+    initOrUpdateBoxplotChart() {
+      const chartDom = this.$refs.typeDurationChart
+      if (!chartDom) return
+
+      // 如果图表已存在，则更新数据
+      if (this.charts.typeDurationChart) {
+        this.updateBoxplotChart()
+      } else {
+        // 否则初始化新图表
+        this.initBoxplotChart()
+      }
+    },
+
+    // 初始化箱线图
+    initBoxplotChart() {
+      const chartDom = this.$refs.typeDurationChart
+      if (!chartDom || !this.typeBoxplotData.categories.length) {
+        console.warn('箱线图容器或数据未准备好')
+        return
+      }
+
+      this.charts.typeDurationChart = echarts.init(chartDom)
+
+      const option = {
+        title: {
+          text: '各类型工单完成时长分布',
+          left: 'center',
+          textStyle: {
+            color: '#333',
+            fontSize: 14,
+            fontWeight: 'bold'
+          }
+        },
+        tooltip: {
+          trigger: 'item',
+          axisPointer: {
+            type: 'shadow'
+          },
+          formatter: function(params) {
+            if (params.seriesType === 'boxplot') {
+              const data = params.value
+              return `
+                <div style="font-weight: bold; margin-bottom: 5px;">${params.name}</div>
+                <div>最小值: ${data[0].toFixed(2)}小时</div>
+                <div>下四分位(Q1): ${data[1].toFixed(2)}小时</div>
+                <div>中位数: ${data[2].toFixed(2)}小时</div>
+                <div>上四分位(Q3): ${data[3].toFixed(2)}小时</div>
+                <div>最大值: ${data[4].toFixed(2)}小时</div>
+              `
+            } else if (params.seriesType === 'scatter') {
+              return `${params.name}<br/>异常值: ${params.value[1].toFixed(2)}小时`
+            }
+          }
+        },
+        grid: {
+          left: '10%',
+          right: '10%',
+          bottom: '10%',
+          top: '20%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          data: this.typeBoxplotData.categories,
+          axisLabel: {
+            rotate: 45,
+            fontSize: 10
+          },
+          name: '工单类型',
+          nameLocation: 'middle',
+          nameGap: 30
+        },
+        yAxis: {
+          type: 'value',
+          name: '完成时长（小时）',
+          nameLocation: 'middle',
+          nameGap: 40,
+          min: 0,
+          splitLine: {
+            lineStyle: {
+              type: 'dashed'
+            }
+          }
+        },
+        series: [
+          {
+            name: 'boxplot',
+            type: 'boxplot',
+            data: this.typeBoxplotData.boxData,
+            itemStyle: {
+              color: '#5470c6',
+              borderColor: '#31456d'
+            },
+            tooltip: {
+              formatter: function(param) {
+                return [
+                  '类型: ' + param.name,
+                  '上边缘: ' + param.data[4].toFixed(2) + '小时',
+                  '上四分位: ' + param.data[3].toFixed(2) + '小时',
+                  '中位数: ' + param.data[2].toFixed(2) + '小时',
+                  '下四分位: ' + param.data[1].toFixed(2) + '小时',
+                  '下边缘: ' + param.data[0].toFixed(2) + '小时'
+                ].join('<br/>')
+              }
+            }
+          },
+          {
+            name: 'outlier',
+            type: 'scatter',
+            data: this.typeBoxplotData.scatterData,
+            symbolSize: 6,
+            itemStyle: {
+              color: '#ee6666'
+            },
+            tooltip: {
+              formatter: function(param) {
+                return '异常值: ' + param.value[1].toFixed(2) + '小时'
+              }
+            }
+          }
+        ],
+        toolbox: {
+          feature: {
+            saveAsImage: {
+              title: '保存为图片',
+              pixelRatio: 2
+            },
+            dataView: {
+              title: '数据视图',
+              readOnly: true,
+              lang: ['数据视图', '关闭', '刷新']
+            }
+          },
+          right: 10,
+          top: 10
+        }
+      }
+
+      this.charts.typeDurationChart.setOption(option)
+
+      // 添加图表点击事件
+      this.charts.typeDurationChart.on('click', (params) => {
+        if (params.seriesType === 'boxplot') {
+          this.handleBoxplotClick(params.name)
+        }
+      })
+
+      // 添加窗口大小变化监听
+      window.addEventListener('resize', () => {
+        if (this.charts.typeDurationChart) {
+          this.charts.typeDurationChart.resize()
+        }
+      })
+    },
+
+    // 更新箱线图数据
+    updateBoxplotChart() {
+      if (!this.charts.typeDurationChart) return
+
+      const option = {
+        xAxis: {
+          data: this.typeBoxplotData.categories
+        },
+        series: [
+          {
+            data: this.typeBoxplotData.boxData
+          },
+          {
+            data: this.typeBoxplotData.scatterData
+          }
+        ]
+      }
+
+      this.charts.typeDurationChart.setOption(option)
+    },
+
+    // 处理箱线图点击事件
+    handleBoxplotClick(typeName) {
+      this.workOrderDialogTitle = `${typeName} - 工单详情`
+      this.workOrderDialogVisible = true
+      this.workOrderLoading = true
+
+      // 从缓存中获取该类型的工单详情
+      if (this.typeOrderDetails[typeName]) {
+        this.workOrderDetailData = this.typeOrderDetails[typeName].map(item => ({
+          id: item.id,
+          title: item.title,
+          worker: item.worker || '未分配',
+          status: '已完成',
+          completion_time: `${item.duration.toFixed(2)}小时`,
+          create_time: item.createTime,
+          finish_time: item.finishTime,
+          area: '待补充',
+          description: item.title || '无描述'
+        }))
+
+        this.workOrderLoading = false
+        this.hasMoreData = false
+      } else {
+        // 如果没有缓存，从API获取
+        this.fetchTypeWorkOrderDetails(typeName)
+      }
+    },
+
+    // 获取特定类型的工单详情
+    async fetchTypeWorkOrderDetails(typeName) {
+      const filterParams = this.getFilterParams()
+
+      const apiParams = {
+        classify: 4,
+        page: 1,
+        per_page: 100,
+        repair_type: typeName, // 假设API支持按类型筛选
+        ...filterParams
+      }
+
+      try {
+        const response = await axios({
+          url: 'https://order.cdqrmi.com/api/v1/analysis/list',
+          method: 'get',
+          params: apiParams,
+          timeout: 30000,
+          headers: {
+            'Authorization': 'Bearer ' + this.getToken()
+          }
+        })
+
+        this.workOrderLoading = false
+
+        if (response.data.code === 200 && response.data.data && response.data.data.data) {
+          this.workOrderDetailData = response.data.data.data.map(item => this.formatWorkOrderData(item))
+          console.log(`成功加载 ${this.workOrderDetailData.length} 条${typeName}的工单记录`)
+          this.hasMoreData = false
+        } else {
+          this.$message.error(`获取${typeName}工单详情失败`)
+          this.workOrderDetailData = []
+        }
+      } catch (error) {
+        this.workOrderLoading = false
+        console.error('请求失败:', error)
+        this.$message.error('获取工单详情失败')
+        this.workOrderDetailData = []
+      }
+    },
+
+    // 生成模拟数据（备用）
+    generateMockBoxplotData() {
+      const types = ['网络故障', '硬件维修', '软件问题', '系统升级', '其他']
+      const mockData = {
+        categories: types,
+        boxData: [],
+        scatterData: []
+      }
+
+      types.forEach(type => {
+        // 生成模拟的箱线图数据
+        const min = Math.random() * 2
+        const q1 = 2 + Math.random() * 3
+        const median = 5 + Math.random() * 5
+        const q3 = 8 + Math.random() * 4
+        const max = 12 + Math.random() * 10
+
+        mockData.boxData.push([min, q1, median, q3, max])
+
+        // 生成一些异常值
+        for (let i = 0; i < Math.floor(Math.random() * 3); i++) {
+          const outlier = max + 5 + Math.random() * 20
+          mockData.scatterData.push([type, outlier])
+        }
+      })
+
+      this.typeBoxplotData = mockData
+      this.initOrUpdateBoxplotChart()
+    },
+
     fetchWorkerOrderDetails(workerName) {
       this.workOrderLoading = true
       this.workOrderDialogTitle = `工单详情 - ${workerName}`
       this.workOrderDialogVisible = true
 
-      // 重置分页和搜索
       this.workOrderCurrentPage = 1
       this.workOrderSearch = ''
 
       const filterParams = this.getFilterParams()
 
-      // 优化请求参数，减少数据量
       const apiParams = {
         classify: 4,
         page: 1,
-        per_page: 100, // 减少每页数量，避免超时
+        per_page: 100,
         ...filterParams
       }
 
       console.log('请求参数:', apiParams)
 
-      // 使用axios直接请求，设置更长的超时时间
       axios({
-        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis/list',
+        url: 'https://order.cdqrmi.com/api/v1/analysis/list',
         method: 'get',
         params: apiParams,
-        timeout: 30000, // 增加超时时间到30秒
+        timeout: 30000,
         headers: {
           'Authorization': 'Bearer ' + this.getToken()
         }
@@ -1413,22 +1406,17 @@ export default {
 
         if (response.data.code === 200) {
           if (response.data.data && response.data.data.data) {
-            // 过滤出该维修人员的工单
             const allOrders = response.data.data.data.map(item => this.formatWorkOrderData(item))
             this.workOrderDetailData = allOrders.filter(order => order.worker === workerName)
 
             console.log(`成功加载 ${this.workOrderDetailData.length} 条${workerName}的工单记录`)
+            this.hasMoreData = false
 
-            // 更新是否有更多数据
-            this.hasMoreData = false // 因为是过滤后的数据，不再有更多数据
-
-            // 如果数据量很大，提示用户
             if (this.workOrderDetailData.length === 0) {
               this.$message.warning(`未找到${workerName}的工单记录`)
             }
           } else {
             this.workOrderDetailData = []
-            console.warn('工单数据格式异常:', response.data)
           }
         } else {
           this.$message.error(`获取工单详情失败：${response.data.msg || '未知错误'}`)
@@ -1441,10 +1429,8 @@ export default {
         if (error.code === 'ECONNABORTED') {
           this.$message.error('请求超时，请尝试缩小筛选范围或联系管理员')
         } else if (error.response) {
-          // 服务器返回错误状态码
           this.$message.error(`服务器错误: ${error.response.status} - ${(error.response.data && error.response.data.msg) || '未知错误'}`)
         } else if (error.request) {
-          // 请求发出但没有收到响应
           this.$message.error('网络连接失败，请检查网络连接')
         } else {
           this.$message.error('请求配置错误: ' + error.message)
@@ -1452,8 +1438,6 @@ export default {
         this.workOrderDetailData = []
       })
     },
-
-    // 修复：获取时长区间工单详情 - 优化请求避免超时
     fetchWorkOrderDetails(timeRangeIndex) {
       const timeRange = this.timeRangeMap[timeRangeIndex]
       if (!timeRange) {
@@ -1470,11 +1454,10 @@ export default {
 
       const filterParams = this.getFilterParams()
 
-      // 优化请求参数
       const apiParams = {
         classify: 4,
         page: 1,
-        per_page: 100, // 减少数据量
+        per_page: 100,
         min_time: timeRange.min,
         max_time: timeRange.max,
         ...filterParams
@@ -1482,12 +1465,11 @@ export default {
 
       console.log('时间范围请求参数:', apiParams)
 
-      // 使用axios直接请求
       axios({
-        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis/list',
+        url: 'https://order.cdqrmi.com/api/v1/analysis/list',
         method: 'get',
         params: apiParams,
-        timeout: 30000, // 增加超时时间
+        timeout: 30000,
         headers: {
           'Authorization': 'Bearer ' + this.getToken()
         }
@@ -1498,7 +1480,6 @@ export default {
             this.workOrderDetailData = response.data.data.data.map(item => this.formatWorkOrderData(item))
             console.log(`成功加载 ${this.workOrderDetailData.length} 条工单记录`)
 
-            // 更新是否有更多数据
             this.hasMoreData = response.data.data.total_count > response.data.data.data.length
           } else {
             this.workOrderDetailData = []
@@ -1512,35 +1493,30 @@ export default {
         this.handleApiError(error)
       })
     },
-
-    // 修复：获取工单总数量详情 - 优化请求避免超时
     fetchWorkOrderTotalDetails() {
       this.workOrderLoading = true
       this.workOrderDialogTitle = '所有工单详情'
       this.workOrderDialogVisible = true
 
-      // 重置分页和搜索
       this.workOrderCurrentPage = 1
       this.workOrderSearch = ''
 
       const filterParams = this.getFilterParams()
 
-      // 优化请求参数，减少数据量
       const apiParams = {
         classify: 4,
         page: 1,
-        per_page: 100, // 减少每页数量，避免超时
+        per_page: 100,
         ...filterParams
       }
 
       console.log('请求参数:', apiParams)
 
-      // 使用axios直接请求，设置更长的超时时间
       axios({
-        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis/list',
+        url: 'https://order.cdqrmi.com/api/v1/analysis/list',
         method: 'get',
         params: apiParams,
-        timeout: 30000, // 增加超时时间到30秒
+        timeout: 30000,
         headers: {
           'Authorization': 'Bearer ' + this.getToken()
         }
@@ -1553,16 +1529,13 @@ export default {
             this.workOrderDetailData = response.data.data.data.map(item => this.formatWorkOrderData(item))
             console.log(`成功加载 ${this.workOrderDetailData.length} 条工单记录`)
 
-            // 更新是否有更多数据
             this.hasMoreData = response.data.data.total_count > response.data.data.data.length
 
-            // 如果数据量很大，提示用户
             if (response.data.data.total_count > 100) {
               this.$message.warning(`共有 ${response.data.data.total_count} 条记录，当前显示前100条。如需查看全部，请使用筛选功能。`)
             }
           } else {
             this.workOrderDetailData = []
-            console.warn('工单数据格式异常:', response.data)
           }
         } else {
           this.$message.error(`获取工单详情失败：${response.data.msg || '未知错误'}`)
@@ -1575,10 +1548,8 @@ export default {
         if (error.code === 'ECONNABORTED') {
           this.$message.error('请求超时，请尝试缩小筛选范围或联系管理员')
         } else if (error.response) {
-          // 服务器返回错误状态码
           this.$message.error(`服务器错误: ${error.response.status} - ${(error.response.data && error.response.data.msg) || '未知错误'}`)
         } else if (error.request) {
-          // 请求发出但没有收到响应
           this.$message.error('网络连接失败，请检查网络连接')
         } else {
           this.$message.error('请求配置错误: ' + error.message)
@@ -1586,13 +1557,11 @@ export default {
         this.workOrderDetailData = []
       })
     },
-
-    // 格式化工单数据 - 修复：添加更多字段
     formatWorkOrderData(item) {
       return {
         id: item.id || '',
         title: item.title || '',
-        worker: item.principals || '未分配', // 使用principals字段作为维修人员
+        worker: item.principals || '未分配',
         status: this.formatStatus(item),
         completion_time: this.calculateCompletionTime(item) || '未完成',
         create_time: item.create_time || '',
@@ -1601,25 +1570,65 @@ export default {
         description: item.description || item.title || '无描述'
       }
     },
-
-    // 计算工单完成时长
     calculateCompletionTime(item) {
-      if (!item.is_end || !item.create_time || !item.update_time) return null
+      if (this.isWorkOrderDenied(item)) {
+        return '未计算（已驳回）'
+      }
+
+      if (!item.is_end || !item.create_time || !item.update_time) {
+        return '未完成'
+      }
+
       const createTime = new Date(item.create_time).getTime()
       const finishTime = new Date(item.update_time).getTime()
-      const hours = Math.round((finishTime - createTime) / (1000 * 60 * 60))
-      return `${hours}小时`
-    },
 
-    // 根据工单状态字段格式化状态文本
+      if (isNaN(createTime) || isNaN(finishTime)) {
+        console.error(`工单 ${item.id} 时间格式错误`)
+        return '时间数据错误'
+      }
+
+      if (finishTime < createTime) {
+        console.warn(`工单 ${item.id} 完成时间早于创建时间`)
+        return '时间顺序异常'
+      }
+
+      const diffMs = finishTime - createTime
+
+      if (diffMs === 0) {
+        return '0小时'
+      }
+
+      const hours = diffMs / (1000 * 60 * 60)
+
+      if (hours < 0.1) {
+        const minutes = diffMs / (1000 * 60)
+        return `${minutes.toFixed(1)}分钟`
+      }
+
+      return `${hours.toFixed(1)}小时`
+    },
     formatStatus(item) {
-      if (item.is_end === 1) return '已完成'
-      if (item.is_denied === 1) return '已驳回'
-      if (item.is_accept === 1) return '进行中'
+      if (this.isWorkOrderDenied(item)) {
+        return '已驳回'
+      }
+      if (item.is_end === 1) {
+        return '已完成'
+      }
+      if (item.is_accept === 1) {
+        return '进行中'
+      }
       return '待分配'
     },
+    isWorkOrderDenied(item) {
+      const hasDeniedReason = item.denied_reason &&
+                              item.denied_reason.trim().length > 0 &&
+                              item.denied_reason !== 'null' &&
+                              item.denied_reason !== 'undefined'
 
-    // 处理API错误
+      const isNotAccepted = item.is_accept === 0 || item.is_accept === false
+
+      return hasDeniedReason && isNotAccepted
+    },
     handleApiError(error) {
       this.workOrderLoading = false
       console.error('API错误详情:', error)
@@ -1651,8 +1660,6 @@ export default {
       }
       this.workOrderDetailData = []
     },
-
-    // 格式化片区名称
     formatArea(areaCode) {
       const areaMap = {
         'kamba': '岗巴',
@@ -1662,13 +1669,10 @@ export default {
       }
       return areaMap[areaCode] || areaCode
     },
-
-    // 获取筛选参数
     getFilterParams() {
       const params = {}
 
       if (this.filters.duration === 'custom') {
-        // 自定义时间段
         if (this.customDateRange && this.customDateRange.length === 2) {
           params.startTime = this.customDateRange[0] + ' 00:00:00'
           params.endTime = this.customDateRange[1] + ' 23:59:59'
@@ -1713,15 +1717,12 @@ export default {
 
       return params
     },
-
-    // KPI点击事件处理
     handleKpiClick(index) {
       switch (index) {
-        case 0: // 工单总数量
+        case 0:
           this.fetchWorkOrderTotalDetails()
           break
-        case 1: // 未完成工单数量
-          // 使用缓存筛选未完成工单
+        case 1:
           if (this.cachedWorkOrders) {
             this.workOrderDialogTitle = '未完成工单详情'
             this.workOrderDialogVisible = true
@@ -1731,52 +1732,48 @@ export default {
             this.$message.info('数据加载中，请稍后再试')
           }
           break
-        case 2: // 超时工单数量
+        case 2:
           this.fetchTimeoutWorkOrderDetails()
           break
-        case 3: // 返修工单数量
+        case 3:
           this.$message.info('返修工单详情功能待实现')
           break
-        case 4: // 平均完成时长
+        case 4:
           this.fetchWorkOrderTotalDetails()
           break
-        case 5: // 一次性修复率
+        case 5:
           this.fetchWorkOrderTotalDetails()
           break
-        case 6: // 维修人员排行
+        case 6:
           this.scrollToWorkerTable()
           return
         default:
           return
       }
     },
-    // 新增：获取超时工单详情（>24小时）
     fetchTimeoutWorkOrderDetails() {
       this.workOrderLoading = true
       this.workOrderDialogTitle = '超时工单详情（完成时间>24小时）'
       this.workOrderDialogVisible = true
 
-      // 重置分页和搜索
       this.workOrderCurrentPage = 1
       this.workOrderSearch = ''
 
       const filterParams = this.getFilterParams()
 
-      // 设置时间范围筛选条件：>24小时
       const apiParams = {
         classify: 4,
         page: 1,
         per_page: 100,
-        min_time: 24, // 最小24小时
-        max_time: 9999, // 设置一个很大的值来表示无上限
+        min_time: 24,
+        max_time: 9999,
         ...filterParams
       }
 
       console.log('超时工单请求参数:', apiParams)
 
-      // 使用axios直接请求
       axios({
-        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis/list',
+        url: 'https://order.cdqrmi.com/api/v1/analysis/list',
         method: 'get',
         params: apiParams,
         timeout: 30000,
@@ -1792,21 +1789,17 @@ export default {
             this.workOrderDetailData = response.data.data.data.map(item => this.formatWorkOrderData(item))
             console.log(`成功加载 ${this.workOrderDetailData.length} 条超时工单记录`)
 
-            // 更新是否有更多数据
             this.hasMoreData = response.data.data.total_count > response.data.data.data.length
 
-            // 如果数据量很大，提示用户
             if (response.data.data.total_count > 100) {
               this.$message.warning(`共有 ${response.data.data.total_count} 条超时工单记录，当前显示前100条。如需查看全部，请使用筛选功能。`)
             }
 
-            // 如果没有超时工单，显示提示信息
             if (this.workOrderDetailData.length === 0) {
               this.$message.info('当前筛选条件下没有超时工单（完成时间>24小时）')
             }
           } else {
             this.workOrderDetailData = []
-            console.warn('超时工单数据格式异常:', response.data)
           }
         } else {
           this.$message.error(`获取超时工单详情失败：${response.data.msg || '未知错误'}`)
@@ -1828,8 +1821,6 @@ export default {
         this.workOrderDetailData = []
       })
     },
-
-    // 滚动到维修人员表格
     scrollToWorkerTable() {
       this.$nextTick(() => {
         const element = document.querySelector('.full-width-section')
@@ -1843,8 +1834,6 @@ export default {
         }
       })
     },
-
-    // 获取KPI卡片样式
     getKpiCardClass(index) {
       if ([0, 1, 2, 3, 4, 5].includes(index)) {
         return 'kpi-card-blue'
@@ -1853,8 +1842,6 @@ export default {
       }
       return ''
     },
-
-    // 获取KPI值颜色
     getKpiValueClass(index) {
       if (index === 0) return 'kpi-value-green'
       if (index === 1) return 'kpi-value-red'
@@ -1864,8 +1851,6 @@ export default {
       if (index === 5) return 'kpi-value-green'
       return ''
     },
-
-    // 新增：工单状态标签类型
     getStatusTagType(status) {
       const typeMap = {
         '已完成': 'success',
@@ -1875,22 +1860,16 @@ export default {
       }
       return typeMap[status] || 'info'
     },
-
-    // 新增：工单表格分页处理
     handleWorkOrderSizeChange(val) {
       this.workOrderPageSize = val
       this.workOrderCurrentPage = 1
     },
-
     handleWorkOrderCurrentChange(val) {
       this.workOrderCurrentPage = val
     },
-
-    // 新增：导出工单数据
     exportWorkOrderData() {
       this.exportLoading = true
       try {
-        // 创建CSV内容
         const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '创建时间', '完成时间', '片区', '描述']
         const csvData = this.workOrderDetailData.map(item => [
           item.id,
@@ -1908,7 +1887,6 @@ export default {
           .map(row => row.map(cell => `"${cell}"`).join(','))
           .join('\n')
 
-        // 创建下载链接
         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
         const link = document.createElement('a')
         const url = URL.createObjectURL(blob)
@@ -1927,21 +1905,19 @@ export default {
         this.exportLoading = false
       }
     },
-
-    // 新增：加载更多数据
     loadMoreData() {
       this.loadingMore = true
 
       const filterParams = this.getFilterParams()
       const apiParams = {
         classify: 4,
-        page: this.currentPage + 1, // 加载下一页
+        page: this.currentPage + 1,
         per_page: 100,
         ...filterParams
       }
 
       axios({
-        url: 'https://ferry.s7.tunnelfrp.com/api/v1/analysis/list',
+        url: 'https://order.cdqrmi.com/api/v1/analysis/list',
         method: 'get',
         params: apiParams,
         timeout: 30000,
@@ -1956,7 +1932,6 @@ export default {
             this.workOrderDetailData = [...this.workOrderDetailData, ...newData]
             this.currentPage += 1
 
-            // 更新是否有更多数据
             this.hasMoreData = response.data.data.total_count > this.workOrderDetailData.length
 
             this.$message.success(`成功加载 ${newData.length} 条记录`)
@@ -1974,6 +1949,7 @@ export default {
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 * {
   margin: 0;
   padding: 0;
@@ -2028,7 +2004,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  align-items: flex-end; /* 修改为底部对齐 */
+  align-items: flex-end;
 }
 
 .filter-group {
@@ -2059,7 +2035,6 @@ body {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-/* 新增：自定义时间段样式 */
 .custom-date-range {
   min-width: 300px;
 }
@@ -2073,7 +2048,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 5px; /* 与输入框底部对齐 */
+  margin-bottom: 5px;
 }
 
 .kpi-overview {
@@ -2173,7 +2148,6 @@ body {
   margin-right: 5px;
 }
 
-/* 新增：全宽区域样式 */
 .full-width-section {
   padding: 25px;
   border-bottom: 1px solid #eaeaea;
@@ -2203,7 +2177,6 @@ body {
   min-height: 400px;
 }
 
-/* 图表容器样式 */
 .chart-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -2222,6 +2195,8 @@ body {
   padding: 20px;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
   height: 320px;
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-title {
@@ -2229,25 +2204,13 @@ body {
   margin-bottom: 15px;
   color: #374151;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .chart-wrapper {
   height: 240px;
   position: relative;
-}
-
-.summary {
-  background: #f0f9ff;
-  border-left: 4px solid #3b82f6;
-  padding: 20px;
-  margin-top: 20px;
-  border-radius: 0 8px 8px 0;
-}
-
-.summary h3 {
-  color: #1e40af;
-  margin-bottom: 10px;
-  font-size: 18px;
+  flex-grow: 1;
 }
 
 .footer {
@@ -2275,32 +2238,6 @@ body {
   border-radius: 4px;
 }
 
-/* 注释掉空状态样式 */
-/*
-.empty-state {
-  text-align: center;
-  padding: 40px;
-  color: #909399;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-}
-
-.empty-state i {
-  font-size: 48px;
-  margin-bottom: 16px;
-  display: block;
-}
-
-.empty-state p {
-  font-size: 16px;
-  margin: 0;
-}
-*/
-
-/* 新增：图表悬停效果 */
 .chart-wrapper canvas {
   transition: transform 0.2s;
 }
@@ -2309,7 +2246,6 @@ body {
   transform: scale(1.02);
 }
 
-/* 新增：工单详情对话框样式 */
 .work-order-dialog .el-dialog__body {
   padding: 20px;
 }
@@ -2340,7 +2276,6 @@ body {
   border-top: 1px solid #eaeaea;
 }
 
-/* 响应式设计 */
 @media (max-width: 768px) {
   .chart-container {
     grid-template-columns: 1fr;

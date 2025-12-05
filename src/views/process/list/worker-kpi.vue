@@ -400,6 +400,7 @@
 </template>
 
 <script>
+
 export default {
   name: 'WorkerKPI',
   data() {
@@ -523,7 +524,15 @@ export default {
       const end = new Date()
       const start = new Date()
       start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
-      this.searchForm.dateRange = [start, end]
+      this.searchForm.dateRange = [this.formatDate(start), this.formatDate(end)]
+    },
+
+    // 格式化日期为 'YYYY-MM-DD'
+    formatDate(date) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
     },
 
     // 维修人员选择变化
@@ -761,7 +770,7 @@ export default {
       if (!window.Chart) return
 
       // 工单类型分布图表
-      const typeCtx = this.$refs.typeChart?.getContext('2d')
+      const typeCtx = this.$refs.typeChart ? this.$refs.typeChart.getContext('2d') : null
       if (typeCtx) {
         const typeData = this.calculateTypeDistribution()
         this.charts.typeChart = new window.Chart(typeCtx, {
@@ -795,7 +804,7 @@ export default {
       }
 
       // 完成时长分布图表
-      const timeCtx = this.$refs.timeChart?.getContext('2d')
+      const timeCtx = this.$refs.timeChart ? this.$refs.timeChart.getContext('2d') : null
       if (timeCtx) {
         const timeData = this.calculateTimeDistribution()
         this.charts.timeChart = new window.Chart(timeCtx, {
@@ -823,7 +832,7 @@ export default {
       }
 
       // 月度趋势图表
-      const trendCtx = this.$refs.trendChart?.getContext('2d')
+      const trendCtx = this.$refs.trendChart ? this.$refs.trendChart.getContext('2d') : null
       if (trendCtx) {
         this.charts.trendChart = new window.Chart(trendCtx, {
           type: 'line',
@@ -845,7 +854,7 @@ export default {
       }
 
       // 片区分布图表
-      const areaCtx = this.$refs.areaChart?.getContext('2d')
+      const areaCtx = this.$refs.areaChart ? this.$refs.areaChart.getContext('2d') : null
       if (areaCtx) {
         const areaData = this.calculateAreaDistribution()
         this.charts.areaChart = new window.Chart(areaCtx, {

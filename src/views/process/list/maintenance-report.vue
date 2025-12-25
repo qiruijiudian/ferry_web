@@ -1226,6 +1226,23 @@ export default {
     },
     updateWorkTypeChart() {
       console.log('更新工单类型分布图表')
+
+      // 检查是否有数据
+      if (!this.reportData.work_order_type_stats ||
+        this.reportData.work_order_type_stats.length === 0) {
+        console.warn('工单类型统计数据为空，饼图可能无法显示')
+
+        // 如果没有数据，初始化一个空图表
+        if (this.chartJsInstances.workTypeChart) {
+          this.chartJsInstances.workTypeChart.data.labels = ['暂无数据']
+          this.chartJsInstances.workTypeChart.data.datasets[0].data = [1]
+          this.chartJsInstances.workTypeChart.data.datasets[0].backgroundColor = ['rgba(200, 200, 200, 0.7)']
+          this.chartJsInstances.workTypeChart.data.datasets[0].borderColor = ['rgb(150, 150, 150)']
+          this.chartJsInstances.workTypeChart.update()
+        }
+        return
+      }
+
       console.log('work_order_type_stats数据:', this.reportData.work_order_type_stats)
 
       if (this.chartJsInstances.workTypeChart && this.reportData.work_order_type_stats) {
@@ -1235,9 +1252,68 @@ export default {
         console.log('工单类型分布 - 标签:', labels)
         console.log('工单类型分布 - 数据:', data)
 
+        // 动态生成颜色（避免hardcode）
+        const colors = this.generateChartColors(labels.length)
+
         this.chartJsInstances.workTypeChart.data.labels = labels
         this.chartJsInstances.workTypeChart.data.datasets[0].data = data
+        this.chartJsInstances.workTypeChart.data.datasets[0].backgroundColor = colors.backgroundColor
+        this.chartJsInstances.workTypeChart.data.datasets[0].borderColor = colors.borderColor
         this.chartJsInstances.workTypeChart.update()
+      }
+    },
+    // 新增：动态生成图表颜色
+    generateChartColors(count) {
+      const colors = {
+        backgroundColor: [],
+        borderColor: []
+      }
+
+      const hueStep = 360 / Math.max(count, 1)
+
+      for (let i = 0; i < count; i++) {
+        const hue = (i * hueStep) % 360
+        const saturation = 70
+        const lightness = 60
+
+        // HSL转RGB
+        const rgb = this.hslToRgb(hue / 360, saturation / 100, lightness / 100)
+        const borderRgb = this.hslToRgb(hue / 360, saturation / 100, Math.max(lightness - 20, 10) / 100)
+
+        colors.backgroundColor.push(`rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.7)`)
+        colors.borderColor.push(`rgb(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b})`)
+      }
+
+      return colors
+    },
+
+    // 新增：HSL转RGB辅助方法
+    hslToRgb(h, s, l) {
+      let r, g, b
+
+      if (s === 0) {
+        r = g = b = l // 灰色
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1
+          if (t > 1) t -= 1
+          if (t < 1 / 6) return p + (q - p) * 6 * t
+          if (t < 1 / 2) return q
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+          return p
+        }
+
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+        const p = 2 * l - q
+        r = hue2rgb(p, q, h + 1 / 3)
+        g = hue2rgb(p, q, h)
+        b = hue2rgb(p, q, h - 1 / 3)
+      }
+
+      return {
+        r: Math.round(r * 255),
+        g: Math.round(g * 255),
+        b: Math.round(b * 255)
       }
     },
     // 修改：更新维修人员数据 - 计算最长和最短完成时间
@@ -1580,38 +1656,16 @@ export default {
         }
       })
 
-      // 初始化工单类型分布图（Chart.js）
+      // 修改饼图初始化，使其支持动态更新
       const workTypeCtx = this.$refs.workTypeChart.getContext('2d')
       this.chartJsInstances.workTypeChart = new window.Chart(workTypeCtx, {
         type: 'pie',
         data: {
-          labels: this.reportData.work_order_type_stats
-            ? this.reportData.work_order_type_stats.map(item => item.type)
-            : [],
+          labels: [], // 初始为空
           datasets: [{
-            data: this.reportData.work_order_type_stats
-              ? this.reportData.work_order_type_stats.map(item => item.count)
-              : [],
-            backgroundColor: [
-              'rgba(239, 68, 68, 0.7)',
-              'rgba(59, 130, 246, 0.7)',
-              'rgba(34, 197, 94, 0.7)',
-              'rgba(251, 191, 36, 0.7)',
-              'rgba(139, 92, 246, 0.7)',
-              'rgba(236, 72, 153, 0.7)',
-              'rgba(20, 184, 166, 0.7)',
-              'rgba(245, 158, 11, 0.7)'
-            ],
-            borderColor: [
-              'rgb(239, 68, 68)',
-              'rgb(59, 130, 246)',
-              'rgb(34, 197, 94)',
-              'rgb(251, 191, 36)',
-              'rgb(139, 92, 246)',
-              'rgb(236, 72, 153)',
-              'rgb(20, 184, 166)',
-              'rgb(245, 158, 11)'
-            ],
+            data: [], // 初始为空
+            backgroundColor: [], // 动态生成
+            borderColor: [], // 动态生成
             borderWidth: 1
           }]
         },
@@ -1626,8 +1680,7 @@ export default {
         }
       })
     },
-
-    // 新增：获取各类型工单完成时长数据（用于箱线图）
+    // 修改：获取各类型工单完成时长数据（用于箱线图），同时统计工单类型
     async fetchTypeDurationData() {
       try {
         const filterParams = this.getFilterParams()
@@ -1657,9 +1710,15 @@ export default {
           const typeGroups = {}
           this.typeOrderDetails = {} // 用于存储每个类型的工单详情
 
+          // 新增：工单类型统计对象
+          const typeStats = {}
+
           orders.forEach(order => {
             // 获取工单类型
             const type = order.work_order_type || '未知类型'
+
+            // 统计所有工单的类型（无论是否完成）
+            typeStats[type] = (typeStats[type] || 0) + 1
 
             // 计算完成时长（只统计已完成的工单）
             if (order.is_end === 1 && order.create_time && order.update_time) {
@@ -1691,13 +1750,20 @@ export default {
           // 将数据转换为箱线图需要的格式
           this.convertToBoxplotData(typeGroups)
 
+          // 新增：将工单类型统计转换为饼图需要的数据格式
+          this.updateWorkTypeStats(typeStats)
+
           // 初始化或更新箱线图
           this.initOrUpdateBoxplotChart()
         }
       } catch (error) {
         console.error('获取类型工单时长数据失败:', error)
-        // 如果获取失败，使用模拟数据
-        this.generateMockBoxplotData()
+        // 如果获取失败，不生成模拟数据，直接返回空数据
+        this.typeBoxplotData = {
+          categories: [],
+          boxData: [],
+          scatterData: []
+        }
       }
     },
 
@@ -1710,34 +1776,59 @@ export default {
       }
 
       Object.entries(typeGroups).forEach(([type, durations]) => {
-        if (durations.length >= 5) { // 至少有5个数据点才显示箱线图
+        if (durations.length >= 2) { // 降低阈值，从5改为3
           this.typeBoxplotData.categories.push(type)
 
           // 排序数据
           const sorted = durations.slice().sort((a, b) => a - b)
 
-          // 计算四分位数
+          // 计算四分位数（修改为处理小样本的算法）
           const q1 = this.calculateQuantile(sorted, 0.25)
           const median = this.calculateQuantile(sorted, 0.5)
           const q3 = this.calculateQuantile(sorted, 0.75)
 
-          // 计算上下边界（1.5倍IQR规则）
+          // 对于小样本，调整IQR规则
           const iqr = q3 - q1
-          const min = Math.max(sorted[0], q1 - 1.5 * iqr)
-          const max = Math.min(sorted[sorted.length - 1], q3 + 1.5 * iqr)
+          const min = durations.length >= 5
+            ? Math.max(sorted[0], q1 - 1.5 * iqr) : sorted[0]
+          const max = durations.length >= 5
+            ? Math.min(sorted[sorted.length - 1], q3 + 1.5 * iqr) : sorted[sorted.length - 1]
 
           // 箱线图数据：[min, q1, median, q3, max]
           this.typeBoxplotData.boxData.push([min, q1, median, q3, max])
 
-          // 散点数据（显示异常值）
-          const outliers = durations.filter(d => d < min || d > max)
-          outliers.forEach(outlier => {
-            this.typeBoxplotData.scatterData.push([type, outlier])
-          })
+          // 散点数据（显示异常值）- 小样本时跳过
+          if (durations.length >= 5) {
+            const outliers = durations.filter(d => d < min || d > max)
+            outliers.forEach(outlier => {
+              this.typeBoxplotData.scatterData.push([type, outlier])
+            })
+          }
         }
       })
 
       return this.typeBoxplotData
+    },
+    // 新增：更新工单类型统计数据
+    updateWorkTypeStats(typeStats) {
+      if (!typeStats || Object.keys(typeStats).length === 0) {
+        console.warn('没有获取到工单类型统计数据')
+        this.reportData.work_order_type_stats = []
+        return
+      }
+
+      // 将统计对象转换为数组
+      this.reportData.work_order_type_stats = Object.entries(typeStats)
+        .map(([type, count]) => ({
+          type: type,
+          count: count
+        }))
+        .sort((a, b) => b.count - a.count) // 按数量降序排序
+
+      console.log('工单类型统计（从工单列表数据中获取）:', this.reportData.work_order_type_stats)
+
+      // 更新饼图
+      this.updateWorkTypeChart()
     },
 
     // 计算分位数
@@ -1773,6 +1864,18 @@ export default {
       const chartDom = this.$refs.typeDurationChart
       if (!chartDom || !this.typeBoxplotData.categories.length) {
         console.warn('箱线图容器或数据未准备好')
+        // 显示提示信息
+        if (chartDom) {
+          const noDataMsg = '暂无足够的数据显示箱线图'
+          chartDom.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999;">
+          <div style="text-align: center;">
+            <i class="el-icon-info" style="font-size: 24px; margin-bottom: 10px;"></i>
+            <div>${noDataMsg}</div>
+          </div>
+        </div>
+      `
+        }
         return
       }
 

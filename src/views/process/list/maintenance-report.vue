@@ -105,16 +105,6 @@
           <el-table-column prop="name" label="维修人员" width="120" />
           <el-table-column prop="completed" label="完成工单数" width="130" />
           <el-table-column prop="total_orders" label="总工单数" width="130" />
-          <!-- <el-table-column label="工单完成率" width="150">
-            <template slot-scope="scope">
-              <div class="completion-rate">
-                <div class="completion-bar"
-                  :style="{ width: scope.row.total_orders > 0 ? (scope.row.completed / scope.row.total_orders * 100) + '%' : '0%' }" />
-              </div>
-              <span>{{ scope.row.total_orders > 0 ? ((scope.row.completed / scope.row.total_orders * 100).toFixed(2)) +
-                '%' : '0%' }}</span>
-            </template>
-</el-table-column> -->
           <el-table-column prop="avgTime" label="平均完成时长(小时)" width="160" />
           <el-table-column prop="maxTime" label="最长完成时间(小时)" width="160" />
           <el-table-column prop="minTime" label="最短完成时间(小时)" width="160" />
@@ -188,10 +178,33 @@
             </template>
           </el-table-column>
           <el-table-column prop="completion_time" label="完成时长(小时)" width="120" sortable="custom" />
-          <el-table-column prop="create_time" label="创建时间" width="180" />
-          <el-table-column prop="finish_time" label="完成时间" width="180" />
+
+          <!-- 新增：分配耗时 -->
+          <el-table-column prop="allocation_time" label="分配耗时" width="120">
+            <template slot-scope="scope">
+              <span v-if="scope.row.allocation_time === '异常工单！'" class="error-text">
+                {{ scope.row.allocation_time }}
+              </span>
+              <span v-else>{{ scope.row.allocation_time }}</span>
+            </template>
+          </el-table-column>
+
+          <!-- 新增：操作耗时 -->
+          <el-table-column prop="operation_time" label="操作耗时" width="120">
+            <template slot-scope="scope">
+              <span v-if="scope.row.operation_time === '异常工单！'" class="error-text">
+                {{ scope.row.operation_time }}
+              </span>
+              <span v-else>{{ scope.row.operation_time }}</span>
+            </template>
+          </el-table-column>
+
           <el-table-column prop="area" label="片区" width="100" />
           <el-table-column prop="work_order_type" label="工单类型" min-width="200" show-overflow-tooltip />
+
+          <!-- 将创建时间和完成时间移到最右边 -->
+          <el-table-column prop="create_time" label="创建时间" width="180" />
+          <el-table-column prop="finish_time" label="完成时间" width="180" />
         </el-table>
       </div>
     </div>
@@ -354,10 +367,33 @@
           </template>
         </el-table-column>
         <el-table-column prop="completion_time" label="完成时长(小时)" width="120" sortable="custom" />
-        <el-table-column prop="create_time" label="创建时间" width="180" sortable="custom" />
-        <el-table-column prop="finish_time" label="完成时间" width="180" sortable="custom" />
+
+        <!-- 新增：分配耗时 -->
+        <el-table-column prop="allocation_time" label="分配耗时" width="120">
+          <template slot-scope="scope">
+            <span v-if="scope.row.allocation_time === '异常工单！'" class="error-text">
+              {{ scope.row.allocation_time }}
+            </span>
+            <span v-else>{{ scope.row.allocation_time }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 新增：操作耗时 -->
+        <el-table-column prop="operation_time" label="操作耗时" width="120">
+          <template slot-scope="scope">
+            <span v-if="scope.row.operation_time === '异常工单！'" class="error-text">
+              {{ scope.row.operation_time }}
+            </span>
+            <span v-else>{{ scope.row.operation_time }}</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="area" label="片区" width="100" />
         <el-table-column prop="work_order_type" label="工单类型" min-width="200" show-overflow-tooltip />
+
+        <!-- 将创建时间和完成时间移到最右边 -->
+        <el-table-column prop="create_time" label="创建时间" width="180" sortable="custom" />
+        <el-table-column prop="finish_time" label="完成时间" width="180" sortable="custom" />
       </el-table>
 
       <div v-if="filteredWorkOrderData.length > 0" class="dialog-pagination">
@@ -424,10 +460,33 @@
           </template>
         </el-table-column>
         <el-table-column prop="completion_time" label="完成时长(小时)" width="120" sortable="custom" />
-        <el-table-column prop="create_time" label="创建时间" width="180" sortable="custom" />
-        <el-table-column prop="finish_time" label="完成时间" width="180" sortable="custom" />
+
+        <!-- 新增：分配耗时 -->
+        <el-table-column prop="allocation_time" label="分配耗时" width="120">
+          <template slot-scope="scope">
+            <span v-if="scope.row.allocation_time === '异常工单！'" class="error-text">
+              {{ scope.row.allocation_time }}
+            </span>
+            <span v-else>{{ scope.row.allocation_time }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 新增：操作耗时 -->
+        <el-table-column prop="operation_time" label="操作耗时" width="120">
+          <template slot-scope="scope">
+            <span v-if="scope.row.operation_time === '异常工单！'" class="error-text">
+              {{ scope.row.operation_time }}
+            </span>
+            <span v-else>{{ scope.row.operation_time }}</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="area" label="片区" width="100" />
         <el-table-column prop="work_order_type" label="工单类型" min-width="200" show-overflow-tooltip />
+
+        <!-- 将创建时间和完成时间移到最右边 -->
+        <el-table-column prop="create_time" label="创建时间" width="180" sortable="custom" />
+        <el-table-column prop="finish_time" label="完成时间" width="180" sortable="custom" />
       </el-table>
 
       <div v-if="durationFilteredData.length > 0" class="dialog-pagination">
@@ -1387,7 +1446,7 @@ export default {
 
     // 修改：备选方案 - 如果获取总工单数失败，使用原有逻辑
     updateWorkerDataFallback() {
-      const sortedWorkers = [...this.reportData.worker_completion].sort((a, b) => b.count - a.count)
+      const sortedWorkers = [...this.reportData.worker_completion].sort((a, b) => b.count - a.sort)
 
       this.workerData = sortedWorkers.map((worker, index) => {
         // 从统计数据中获取最长和最短完成时间
@@ -1622,7 +1681,8 @@ export default {
                   duration: durationHours,
                   worker: order.principals,
                   createTime: order.create_time,
-                  finishTime: order.update_time
+                  finishTime: order.update_time,
+                  circulation_history: order.circulation_history || []
                 })
               }
             }
@@ -1879,16 +1939,14 @@ export default {
 
       // 从缓存中获取该类型的工单详情
       if (this.typeOrderDetails[typeName]) {
-        this.workOrderDetailData = this.typeOrderDetails[typeName].map(item => ({
-          id: item.id,
-          title: item.title,
-          worker: item.worker || '未分配',
-          status: '已完成',
-          completion_time: `${item.duration.toFixed(2)}小时`,
+        this.workOrderDetailData = this.typeOrderDetails[typeName].map(item => this.formatWorkOrderData({
+          ...item,
+          work_order_type: typeName,
+          principals: item.worker,
           create_time: item.createTime,
-          finish_time: item.finishTime,
-          area: '待补充',
-          work_order_type: typeName
+          update_time: item.finishTime,
+          is_end: 1,
+          circulation_history: item.circulation_history
         }))
 
         this.workOrderLoading = false
@@ -1974,7 +2032,7 @@ export default {
         url: 'https://order.cdqrmi.com/api/v1/analysis/list',
         method: 'get',
         params: apiParams,
-        timeout: 30000,
+        timeout: 60000,
         headers: {
           'Authorization': 'Bearer ' + this.getToken()
         }
@@ -2135,24 +2193,92 @@ export default {
         this.workOrderDetailData = []
       })
     },
-    // 新增：获取工单类型（hardcode）
-    getWorkOrderType(item) {
-      // 这里可以根据item的一些属性来判断类型，目前直接返回"-"
-      return '-'
-    },
+    // 修改后的formatWorkOrderData方法
     formatWorkOrderData(item) {
+      // 计算分配耗时和操作耗时
+      const timeStats = this.calculateAllocationAndOperationTime(item.circulation_history || [])
+
       return {
         id: item.id || '',
         title: item.title || '',
         worker: item.principals || '未分配',
         status: this.formatStatus(item),
         completion_time: this.calculateCompletionTime(item) || '未完成',
+        // 新增列：分配耗时和操作耗时
+        allocation_time: timeStats.allocationTime,
+        operation_time: timeStats.operationTime,
         create_time: item.create_time || '',
         finish_time: item.is_end ? item.update_time : '未完成',
         area: this.formatArea(item.belongs || item.area),
-        work_order_type: item.work_order_type || '-' // 修改：使用work_order_type字段
+        work_order_type: item.work_order_type || '-'
       }
     },
+
+    // 新增方法：计算分配耗时和操作耗时
+    calculateAllocationAndOperationTime(circulationHistory) {
+      if (!circulationHistory || circulationHistory.length === 0) {
+        return {
+          allocationTime: '异常工单！',
+          operationTime: '异常工单！'
+        }
+      }
+
+      let allocationTime = 0
+      let operationTime = 0
+      let foundFirstAllocation = false
+      let allocationIndex = -1
+
+      // 第一步：找到第一个"分配节点"的位置
+      circulationHistory.forEach((record, index) => {
+        const state = record.state || ''
+
+        if (state === '分配节点' && !foundFirstAllocation) {
+          allocationTime = record.cost_duration || 0
+          foundFirstAllocation = true
+          allocationIndex = index
+        }
+      })
+
+      // 如果没有找到分配节点，返回异常
+      if (!foundFirstAllocation) {
+        return {
+          allocationTime: '异常工单！',
+          operationTime: '异常工单！'
+        }
+      }
+
+      // 第二步：计算操作耗时（从第一个分配节点之后的所有节点）
+      if (foundFirstAllocation && allocationIndex >= 0) {
+        for (let i = allocationIndex + 1; i < circulationHistory.length; i++) {
+          operationTime += circulationHistory[i].cost_duration || 0
+        }
+      }
+
+      // 格式化显示
+      const formatDuration = (seconds) => {
+        if (seconds < 60) {
+          return `${seconds}秒`
+        } else if (seconds < 3600) {
+          const minutes = Math.round(seconds / 60)
+          return `${minutes}分钟`
+        } else {
+          const hours = Math.floor(seconds / 3600)
+          const remainingSeconds = seconds % 3600
+          const minutes = Math.round(remainingSeconds / 60)
+          if (minutes > 0) {
+            return `${hours}小时${minutes}分钟`
+          } else {
+            return `${hours}小时`
+          }
+        }
+      }
+
+      return {
+        allocationTime: formatDuration(allocationTime),
+        operationTime: formatDuration(operationTime)
+      }
+    },
+
     // 处理柱状图点击事件
     async handleDurationBarClick(index) {
       const label = this.chartJsInstances.durationChart.data.labels[index]
@@ -2242,16 +2368,22 @@ export default {
     },
     // 格式化工单时长分布数据
     formatDurationOrderData(item) {
+      // 计算分配耗时和操作耗时
+      const timeStats = this.calculateAllocationAndOperationTime(item.circulation_history || [])
+
       return {
         id: item.id || '',
         title: item.title || '',
         worker: item.principals || '未分配',
         status: this.formatStatus(item),
         completion_time: this.calculateCompletionTime(item) || '未完成',
+        // 新增列
+        allocation_time: timeStats.allocationTime,
+        operation_time: timeStats.operationTime,
         create_time: item.create_time || '',
         finish_time: item.is_end ? item.update_time : '未完成',
         area: this.formatArea(item.belongs || item.area),
-        work_order_type: item.work_order_type || '-' // 修改：使用work_order_type字段
+        work_order_type: item.work_order_type || '-'
       }
     },
 
@@ -2302,17 +2434,25 @@ export default {
           })
 
           // 格式化超时工单数据
-          this.timeoutOrdersData = timeoutOrders.map(item => ({
-            id: item.id || '',
-            title: item.title || '',
-            worker: item.principals || '未分配',
-            status: '已完成',
-            completion_time: this.calculateCompletionTime(item),
-            create_time: item.create_time || '',
-            finish_time: item.update_time || '',
-            area: this.formatArea(item.belongs || item.area),
-            work_order_type: item.work_order_type || '-' // 修改：使用work_order_type字段
-          }))
+          this.timeoutOrdersData = timeoutOrders.map(item => {
+            // 计算分配耗时和操作耗时
+            const timeStats = this.calculateAllocationAndOperationTime(item.circulation_history || [])
+
+            return {
+              id: item.id || '',
+              title: item.title || '',
+              worker: item.principals || '未分配',
+              status: '已完成',
+              completion_time: this.calculateCompletionTime(item),
+              // 新增列
+              allocation_time: timeStats.allocationTime,
+              operation_time: timeStats.operationTime,
+              create_time: item.create_time || '',
+              finish_time: item.update_time || '',
+              area: this.formatArea(item.belongs || item.area),
+              work_order_type: item.work_order_type || '-'
+            }
+          })
 
           console.log(`加载了 ${this.timeoutOrdersData.length} 条超时工单记录`)
         } else {
@@ -2333,6 +2473,17 @@ export default {
       this.$message.success('超时工单数据已刷新')
     },
 
+    // 判断工单是否被驳回（重用已有的方法）
+    isWorkOrderDenied(item) {
+      const hasDeniedReason = item.denied_reason &&
+        item.denied_reason.trim().length > 0 &&
+        item.denied_reason !== 'null' &&
+        item.denied_reason !== 'undefined'
+
+      const isNotAccepted = item.is_accept === 0 || item.is_accept === false
+
+      return hasDeniedReason && isNotAccepted
+    },
     calculateCompletionTime(item) {
       if (this.isWorkOrderDenied(item)) {
         return '未计算（已驳回）'
@@ -2382,7 +2533,6 @@ export default {
       }
       return '待分配'
     },
-
     handleApiError(error) {
       this.workOrderLoading = false
       console.error('API错误详情:', error)
@@ -2627,17 +2777,19 @@ export default {
     exportWorkOrderData() {
       this.exportLoading = true
       try {
-        const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '创建时间', '完成时间', '片区', '工单类型']
+        const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '分配耗时', '操作耗时', '片区', '工单类型', '创建时间', '完成时间']
         const csvData = this.filteredWorkOrderData.map(item => [
           item.id,
           item.title,
           item.worker,
           item.status,
           item.completion_time,
-          item.create_time,
-          item.finish_time,
+          item.allocation_time,
+          item.operation_time,
           item.area,
-          item.work_order_type
+          item.work_order_type,
+          item.create_time,
+          item.finish_time
         ])
 
         const csvContent = [headers, ...csvData]
@@ -2662,6 +2814,49 @@ export default {
         this.exportLoading = false
       }
     },
+
+    // 导出时长分布数据
+    exportDurationData() {
+      this.durationExportLoading = true
+      try {
+        const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '分配耗时', '操作耗时', '片区', '工单类型', '创建时间', '完成时间']
+        const csvData = this.durationFilteredData.map(item => [
+          item.id,
+          item.title,
+          item.worker,
+          item.status,
+          item.completion_time,
+          item.allocation_time,
+          item.operation_time,
+          item.area,
+          item.work_order_type,
+          item.create_time,
+          item.finish_time
+        ])
+
+        const csvContent = [headers, ...csvData]
+          .map(row => row.map(cell => `"${cell}"`).join(','))
+          .join('\n')
+
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', `工单时长分布_${this.currentTime}.csv`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        this.$message.success('数据导出成功')
+      } catch (error) {
+        console.error('导出数据失败:', error)
+        this.$message.error('数据导出失败')
+      } finally {
+        this.durationExportLoading = false
+      }
+    },
+
     loadMoreData() {
       this.loadingMore = true
 
@@ -2891,6 +3086,12 @@ export default {
           // 提取数字部分进行排序
           valA = this.extractTimeValue(valA)
           valB = this.extractTimeValue(valB)
+        } else if (prop === 'allocation_time' || prop === 'operation_time') {
+          // 处理分配耗时和操作耗时的排序（跳过异常工单）
+          if (valA === '异常工单！') valA = -1
+          if (valB === '异常工单！') valB = -1
+          valA = this.extractDurationValue(valA)
+          valB = this.extractDurationValue(valB)
         } else if (prop === 'create_time' || prop === 'finish_time') {
           valA = new Date(valA).getTime()
           valB = new Date(valB).getTime()
@@ -2919,6 +3120,51 @@ export default {
       }
 
       return isNaN(num) ? 0 : num
+    },
+
+    // 新增：提取耗时值用于排序
+    extractDurationValue(durationStr) {
+      if (!durationStr || durationStr === '异常工单！' || durationStr === '--') {
+        return 0
+      }
+
+      // 解析格式如：586秒、10分钟、2小时30分钟
+      let totalSeconds = 0
+
+      if (durationStr.includes('小时')) {
+        const hourParts = durationStr.split('小时')
+        const hours = parseInt(hourParts[0]) || 0
+        totalSeconds += hours * 3600
+
+        if (hourParts[1] && hourParts[1].includes('分钟')) {
+          const minuteParts = hourParts[1].split('分钟')
+          const minutes = parseInt(minuteParts[0]) || 0
+          totalSeconds += minutes * 60
+        }
+      } else if (durationStr.includes('分钟')) {
+        const minutes = parseInt(durationStr) || 0
+        totalSeconds += minutes * 60
+      } else if (durationStr.includes('秒')) {
+        totalSeconds += parseInt(durationStr) || 0
+      }
+
+      return totalSeconds
+    },
+
+    // 修改后的工单类型获取方法
+    getWorkOrderType(item) {
+      return item.work_order_type || '-'
+    },
+
+    // 处理时长分布分页大小变化
+    handleDurationSizeChange(val) {
+      this.durationPageSize = val
+      this.durationCurrentPage = 1
+    },
+
+    // 处理时长分布当前页变化
+    handleDurationCurrentChange(val) {
+      this.durationCurrentPage = val
     }
   }
 }
@@ -3251,6 +3497,12 @@ body {
   text-align: right;
   padding: 10px 0;
   border-top: 1px solid #eaeaea;
+}
+
+/* 新增：异常工单红色字体样式 */
+.error-text {
+  color: #ff0000 !important;
+  font-weight: bold;
 }
 
 @media (max-width: 768px) {

@@ -1190,7 +1190,7 @@ export default {
           },
           params: params
         })
-
+        console.log('请求url:https://order.cdqrmi.com/api/v1/analysis')
         if (response.data.code === 200) {
           console.log('API返回的原始数据:', response.data)
           this.reportData = response.data.data

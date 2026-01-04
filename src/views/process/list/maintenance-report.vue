@@ -134,6 +134,21 @@
         </div>
       </div>
     </div>
+    <!-- 新增：第三行图表（故障类型频率和地区故障频率） -->
+    <div class="chart-container">
+      <div class="chart-box">
+        <div class="chart-title">故障类型频率</div>
+        <div class="chart-wrapper">
+          <canvas ref="failureTypeChart" />
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">各地区故障频率</div>
+        <div class="chart-wrapper">
+          <canvas ref="regionFailureChart" />
+        </div>
+      </div>
+    </div>
     <!-- 添加的超时工单统计表 -->
     <div class="full-width-section timeout-section">
       <div class="section-header">
@@ -686,7 +701,23 @@ export default {
 
       // 新增：表格排序
       sortProp: '',
-      sortOrder: ''
+      sortOrder: '',
+      // 新增：故障类型频率图表数据
+      failureTypeChartInstance: null,
+      regionFailureChartInstance: null,
+
+      // 新增：故障类型统计数据
+      failureTypeStats: {
+        labels: [], // 故障类型
+        data: [] // 频率数据
+      },
+
+      // 新增：地区故障频率统计数据
+      regionFailureStats: {
+        regions: [], // 地区
+        failureTypes: [], // 故障类型
+        data: [] // 二维数组 [地区][故障类型] = 频率
+      }
     }
   },
   computed: {
@@ -1550,11 +1581,16 @@ export default {
 
         const script = document.createElement('script')
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js'
-        script.onload = resolve
+        script.onload = () => {
+          // 初始化所有图表
+          this.initCharts()
+          resolve()
+        }
         script.onerror = reject
         document.head.appendChild(script)
       })
     },
+
     formatDate(date) {
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -1680,6 +1716,260 @@ export default {
         }
       })
     },
+    // 新增：计算故障类型频率数据
+    calculateFailureTypeStats(orders) {
+      const typeCount = {}
+      const totalOrders = orders.length
+
+      // 统计每种工单类型的数量
+      orders.forEach(order => {
+        const type = order.work_order_type || '未知类型'
+        typeCount[type] = (typeCount[type] || 0) + 1
+      })
+
+      // 转换为数组并排序
+      const statsArray = Object.entries(typeCount)
+        .map(([type, count]) => ({
+          type,
+          count,
+          percentage: ((count / totalOrders) * 100).toFixed(2)
+        }))
+        .sort((a, b) => b.count - a.count)
+
+      // 更新数据
+      this.failureTypeStats.labels = statsArray.map(item => item.type)
+      this.failureTypeStats.data = statsArray.map(item => parseFloat(item.percentage))
+
+      return statsArray
+    },
+
+    // 新增：计算各地区故障频率数据
+    calculateRegionFailureStats(orders) {
+      const regionMap = {
+        'kamba': '岗巴',
+        'sayga': '萨迦',
+        'cona': '错那',
+        'lhasa': '拉萨'
+      }
+
+      // 初始化数据结构
+      const regionStats = {}
+      const allFailureTypes = new Set()
+
+      // 初始化地区数据
+      Object.values(regionMap).forEach(region => {
+        regionStats[region] = {}
+      })
+
+      // 统计每个地区的故障类型
+      orders.forEach(order => {
+        const region = regionMap[order.belongs] || '其他地区'
+        const type = order.work_order_type || '未知类型'
+
+        if (!regionStats[region]) {
+          regionStats[region] = {}
+        }
+
+        regionStats[region][type] = (regionStats[region][type] || 0) + 1
+        allFailureTypes.add(type)
+      })
+
+      // 获取所有故障类型（取前6种）
+      const failureTypes = Array.from(allFailureTypes).slice(0, 6)
+
+      // 构建数据数组
+      const regions = Object.keys(regionStats)
+      const data = []
+
+      failureTypes.forEach((type, typeIndex) => {
+        const typeData = {}
+
+        regions.forEach(region => {
+          const count = regionStats[region][type] || 0
+          const total = Object.values(regionStats[region]).reduce((sum, val) => sum + val, 0)
+
+          // 计算频率（该类型在该地区的占比）
+          const frequency = total > 0 ? (count / total * 100).toFixed(2) : 0
+          typeData[region] = parseFloat(frequency)
+        })
+
+        data.push(typeData)
+      })
+
+      // 更新数据
+      this.regionFailureStats.regions = regions
+      this.regionFailureStats.failureTypes = failureTypes
+      this.regionFailureStats.data = data
+
+      return {
+        regions,
+        failureTypes,
+        data
+      }
+    },
+
+    // 修复后的：初始化故障类型频率图表
+    initFailureTypeChart() {
+      // 修复可选链操作符
+      const chartRef = this.$refs.failureTypeChart
+      if (!chartRef) return
+
+      const ctx = chartRef.getContext('2d')
+      if (!ctx) return
+
+      if (this.failureTypeChartInstance) {
+        this.failureTypeChartInstance.destroy()
+      }
+
+      this.failureTypeChartInstance = new window.Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: this.failureTypeStats.labels,
+          datasets: [{
+            label: '故障类型占比 (%)',
+            data: this.failureTypeStats.data,
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '占比 (%)'
+              },
+              ticks: {
+                callback: function(value) {
+                  return value + '%'
+                }
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: '故障类型'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: ${context.parsed.y}%`
+                }
+              }
+            }
+          }
+        }
+      })
+    },
+
+    // 修复后的：初始化各地区故障频率图表
+    initRegionFailureChart() {
+      // 修复可选链操作符
+      const chartRef = this.$refs.regionFailureChart
+      if (!chartRef) return
+
+      const ctx = chartRef.getContext('2d')
+      if (!ctx) return
+
+      if (this.regionFailureChartInstance) {
+        this.regionFailureChartInstance.destroy()
+      }
+
+      // 生成颜色数组
+      const colors = [
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(54, 162, 235, 0.7)',
+        'rgba(255, 206, 86, 0.7)',
+        'rgba(75, 192, 192, 0.7)',
+        'rgba(153, 102, 255, 0.7)',
+        'rgba(255, 159, 64, 0.7)'
+      ]
+
+      // 准备数据集
+      const datasets = this.regionFailureStats.failureTypes.map((type, index) => ({
+        label: type,
+        data: this.regionFailureStats.regions.map(region => {
+          const typeData = this.regionFailureStats.data[index]
+          return typeData ? typeData[region] || 0 : 0
+        }),
+        backgroundColor: colors[index % colors.length],
+        borderColor: colors[index % colors.length].replace('0.7', '1'),
+        borderWidth: 1
+      }))
+
+      this.regionFailureChartInstance = new window.Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: this.regionFailureStats.regions,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: '频率 (%)'
+              },
+              ticks: {
+                callback: function(value) {
+                  return value + '%'
+                }
+              },
+              stacked: false
+            },
+            x: {
+              title: {
+                display: true,
+                text: '地区'
+              },
+              stacked: false
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: ${context.parsed.y}%`
+                }
+              }
+            }
+          }
+        }
+      })
+    },
+
+    // 新增：更新所有图表数据
+    async updateAllCharts(orders) {
+      // 计算故障类型统计数据
+      this.calculateFailureTypeStats(orders)
+      this.calculateRegionFailureStats(orders)
+
+      // 初始化或更新图表
+      this.$nextTick(() => {
+        this.initFailureTypeChart()
+        this.initRegionFailureChart()
+      })
+    },
     // 修改：获取各类型工单完成时长数据（用于箱线图），同时统计工单类型
     async fetchTypeDurationData() {
       try {
@@ -1755,6 +2045,9 @@ export default {
 
           // 初始化或更新箱线图
           this.initOrUpdateBoxplotChart()
+
+          // 新增：更新故障类型频率图表
+          await this.updateAllCharts(orders)
         }
       } catch (error) {
         console.error('获取类型工单时长数据失败:', error)

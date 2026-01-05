@@ -136,12 +136,101 @@
     </div>
     <!-- 新增：第三行图表（故障类型频率和地区故障频率） -->
     <div class="chart-container">
-      <div class="chart-box">
-        <div class="chart-title">故障类型频率</div>
-        <div class="chart-wrapper">
-          <canvas ref="failureTypeChart" />
+      <!-- 故障原因表格 -->
+      <div class="chart-box fault-reason-table">
+        <div class="chart-title">故障原因列表</div>
+
+        <!-- 故障原因筛选 -->
+        <div class="fault-reason-filter">
+          <el-input
+            v-model="faultReasonFilter"
+            placeholder="筛选故障原因..."
+            prefix-icon="el-icon-search"
+            clearable
+            size="small"
+            style="width: 100%; margin-bottom: 10px;"
+            @input="handleFaultReasonFilter"
+          />
+          <div class="filter-options">
+            <el-button
+              type="text"
+              size="mini"
+              :class="{ 'active': showOnlyEmptyFaultReason }"
+              @click="toggleEmptyFaultReason"
+            >
+              <i class="el-icon-warning" style="color: #f56c6c;" />
+              仅显示未填写原因
+            </el-button>
+            <el-button type="text" size="mini" @click="resetFaultReasonFilter">
+              重置筛选
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 故障原因表格容器 - 使用特定的类名 -->
+        <div class="fault-reason-container">
+          <el-table
+            v-loading="faultReasonLoading"
+            :data="paginatedFaultReasonData"
+            style="width: 100%"
+            size="mini"
+            stripe
+            highlight-current-row
+            :row-class-name="faultReasonRowClassName"
+            :height="250"
+          >
+            <el-table-column prop="id" label="ID" width="70" fixed="left" />
+            <el-table-column prop="title" label="标题" width="120" show-overflow-tooltip />
+            <el-table-column prop="fault_reason" label="故障原因" min-width="180">
+              <template slot-scope="scope">
+                <span v-if="scope.row.fault_reason && scope.row.fault_reason.trim() !== ''">
+                  {{ scope.row.fault_reason }}
+                </span>
+                <span v-else style="color: #f56c6c; font-weight: bold;">未填写原因</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="belongs" label="片区" width="80">
+              <template slot-scope="scope">
+                {{ formatArea(scope.row.belongs) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="worker" label="维修人员" width="100">
+              <template slot-scope="scope">
+                {{ scope.row.worker || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="work_order_type" label="工单类型" width="80">
+              <template slot-scope="scope">
+                {{ scope.row.work_order_type || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="状态" width="70">
+              <template slot-scope="scope">
+                <el-tag :type="getStatusTagType(scope.row.status)" size="mini">
+                  {{ scope.row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- 分页 -->
+          <div v-if="filteredFaultReasonData.length > 0" class="table-pagination">
+            <span class="total-count">共 {{ filteredFaultReasonData.length }} 条记录</span>
+            <el-pagination
+              :current-page="faultReasonCurrentPage"
+              :page-sizes="[5, 10, 20, 50]"
+              :page-size="faultReasonPageSize"
+              :total="filteredFaultReasonData.length"
+              layout="sizes, prev, pager, next"
+              small
+              @size-change="handleFaultReasonSizeChange"
+              @current-change="handleFaultReasonCurrentChange"
+            />
+          </div>
         </div>
       </div>
+
+      <!-- 各地区故障频率图表保持不变 -->
       <div class="chart-box">
         <div class="chart-title">各地区故障频率</div>
         <div class="chart-wrapper">
@@ -717,7 +806,15 @@ export default {
         regions: [], // 地区
         failureTypes: [], // 故障类型
         data: [] // 二维数组 [地区][故障类型] = 频率
-      }
+      },
+      // 新增：故障原因相关数据（添加在这里）
+      faultReasonData: [],
+      faultReasonFilter: '',
+      showOnlyEmptyFaultReason: false,
+      faultReasonLoading: false,
+      faultReasonCurrentPage: 1,
+      faultReasonPageSize: 10,
+      tableBodyHeight: 250 // 初始高度，会在mounted中计算
     }
   },
   computed: {
@@ -948,6 +1045,38 @@ export default {
       const start = (this.durationCurrentPage - 1) * this.durationPageSize
       const end = start + this.durationPageSize
       return this.durationFilteredData.slice(start, end)
+    },
+    // 新增：筛选后的故障原因数据
+    filteredFaultReasonData() {
+      let data = this.faultReasonData
+
+      if (this.faultReasonFilter.trim()) {
+        const filter = this.faultReasonFilter.trim().toLowerCase()
+        data = data.filter(item => {
+          return (
+            (item.title && item.title.toLowerCase().includes(filter)) ||
+            (item.fault_reason && item.fault_reason.toLowerCase().includes(filter)) ||
+            (item.worker && item.worker.toLowerCase().includes(filter)) ||
+            (item.work_order_type && item.work_order_type.toLowerCase().includes(filter)) ||
+            (this.formatArea(item.belongs) && this.formatArea(item.belongs).toLowerCase().includes(filter))
+          )
+        })
+      }
+
+      if (this.showOnlyEmptyFaultReason) {
+        data = data.filter(item =>
+          !item.fault_reason || item.fault_reason.trim() === ''
+        )
+      }
+
+      return data
+    },
+
+    // 新增：分页后的故障原因数据
+    paginatedFaultReasonData() {
+      const start = (this.faultReasonCurrentPage - 1) * this.faultReasonPageSize
+      const end = start + this.faultReasonPageSize
+      return this.filteredFaultReasonData.slice(start, end)
     }
   },
   mounted() {
@@ -958,6 +1087,11 @@ export default {
       console.log('Chart.js加载完成，开始初始化图表')
       this.initCharts()
     })
+    // 新增：计算表格高度
+    this.calculateTableHeight()
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', this.handleResize)
   },
   beforeDestroy() {
     // 销毁ECharts实例避免内存泄漏
@@ -971,6 +1105,8 @@ export default {
         chart.destroy()
       }
     })
+    // 新增：移除窗口大小变化监听
+    window.removeEventListener('resize', this.handleResize)
   },
   methods: {
     handleDurationChange(value) {
@@ -1066,6 +1202,11 @@ export default {
           // 获取箱线图数据
           this.fetchTypeDurationData()
           this.updateWorkTypeChart()
+          // 新增：重新获取故障原因数据
+          const typeDurationData = await this.getTypeDurationData(params)
+          if (typeDurationData) {
+            this.extractFaultReasonData(typeDurationData)
+          }
 
           let message = `已应用筛选: 时长=${this.getDurationText(this.filters.duration)}`
           if (this.filters.duration === 'custom' && this.customDateRange.length === 2) {
@@ -1957,16 +2098,79 @@ export default {
         }
       })
     },
+    // 新增：提取故障原因数据
+    extractFaultReasonData(orders) {
+      this.faultReasonData = orders.map(order => {
+        return {
+          id: order.id,
+          title: order.title || '-',
+          fault_reason: order.fault_reason || '',
+          belongs: order.belongs || '',
+          worker: order.principals || '-',
+          work_order_type: order.work_order_type || '-',
+          status: this.formatStatus(order),
+          create_time: order.create_time || '',
+          finish_time: order.update_time || ''
+        }
+      })
 
-    // 新增：更新所有图表数据
+      console.log('提取故障原因数据:', this.faultReasonData.length, '条记录')
+
+      // 统计未填写原因的数量
+      const emptyCount = this.faultReasonData.filter(item =>
+        !item.fault_reason || item.fault_reason.trim() === ''
+      ).length
+
+      console.log(`未填写原因的工单数: ${emptyCount}`)
+    },
+
+    // 新增：处理故障原因筛选
+    handleFaultReasonFilter() {
+      this.faultReasonCurrentPage = 1
+    },
+
+    // 新增：切换只显示未填写原因
+    toggleEmptyFaultReason() {
+      this.showOnlyEmptyFaultReason = !this.showOnlyEmptyFaultReason
+      this.faultReasonCurrentPage = 1
+    },
+
+    // 新增：重置故障原因筛选
+    resetFaultReasonFilter() {
+      this.faultReasonFilter = ''
+      this.showOnlyEmptyFaultReason = false
+      this.faultReasonCurrentPage = 1
+    },
+
+    // 新增：处理故障原因表格行样式
+    faultReasonRowClassName({ row }) {
+      if (!row.fault_reason || row.fault_reason.trim() === '') {
+        return 'empty-fault-reason-row'
+      }
+      return ''
+    },
+
+    // 新增：处理故障原因表格分页大小变化
+    handleFaultReasonSizeChange(val) {
+      this.faultReasonPageSize = val
+      this.faultReasonCurrentPage = 1
+    },
+
+    // 新增：处理故障原因表格当前页变化
+    handleFaultReasonCurrentChange(val) {
+      this.faultReasonCurrentPage = val
+    },
+
+    // 修改：更新所有图表数据（移除故障类型图表初始化）
     async updateAllCharts(orders) {
-      // 计算故障类型统计数据
-      this.calculateFailureTypeStats(orders)
+      // 提取故障原因数据
+      this.extractFaultReasonData(orders)
+
+      // 计算地区故障频率统计数据
       this.calculateRegionFailureStats(orders)
 
-      // 初始化或更新图表
+      // 只初始化地区故障频率图表
       this.$nextTick(() => {
-        this.initFailureTypeChart()
         this.initRegionFailureChart()
       })
     },
@@ -2047,7 +2251,11 @@ export default {
           this.initOrUpdateBoxplotChart()
 
           // 新增：更新故障类型频率图表
-          await this.updateAllCharts(orders)
+          this.extractFaultReasonData(orders)
+          this.calculateRegionFailureStats(orders)
+          this.$nextTick(() => {
+            this.initRegionFailureChart()
+          })
         }
       } catch (error) {
         console.error('获取类型工单时长数据失败:', error)
@@ -3561,8 +3769,26 @@ export default {
     // 处理时长分布当前页变化
     handleDurationCurrentChange(val) {
       this.durationCurrentPage = val
+    },
+    // 新增：计算表格高度
+    calculateTableHeight() {
+      // 设置一个固定高度，可以根据需要调整
+      // 300px容器高度 - 分页区域高度(约40px) - 内边距和边框(约10px)
+      this.tableBodyHeight = 250
+
+      // 或者根据窗口大小动态计算
+      // const windowHeight = window.innerHeight;
+      // this.tableBodyHeight = Math.min(250, windowHeight * 0.4);
+
+      return this.tableBodyHeight
+    },
+
+    // 新增：处理窗口大小变化
+    handleResize() {
+      this.calculateTableHeight()
     }
   }
+
 }
 </script>
 
@@ -4034,5 +4260,155 @@ body {
 
 .duration-order-dialog[data-duration=">24小时"] .el-dialog__header {
   background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
+}
+
+/* 故障原因表格特定容器样式 */
+.fault-reason-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  background-color: #fff;
+  overflow: hidden;
+  height: 300px;
+  /* 固定高度 */
+}
+
+/* 故障原因表格的el-table样式 */
+.fault-reason-container .el-table {
+  flex: 1;
+  overflow: auto;
+}
+
+/* 故障原因表格的el-table主体包装器 */
+.fault-reason-container .el-table__body-wrapper {
+  overflow-y: auto !important;
+  max-height: calc(100% - 40px);
+}
+
+/* 故障原因表格的表格头固定 */
+.fault-reason-container .el-table__header-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #fff;
+}
+
+/* 故障原因表格的分页样式 */
+.fault-reason-container .table-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  border-top: 1px solid #ebeef5;
+  background-color: #fff;
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  flex-shrink: 0;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* 故障原因表格的单元格样式 */
+.fault-reason-container .el-table th,
+.fault-reason-container .el-table td {
+  padding: 8px 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 故障原因表格的总计数样式 */
+.fault-reason-container .total-count {
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 故障原因表格的自定义滚动条 */
+.fault-reason-container .el-table__body-wrapper::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.fault-reason-container .el-table__body-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.fault-reason-container .el-table__body-wrapper::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.fault-reason-container .el-table__body-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 故障原因表格的行样式 */
+.empty-fault-reason-row {
+  background-color: #fff5f5 !important;
+}
+
+.empty-fault-reason-row:hover>td {
+  background-color: #fef0f0 !important;
+}
+
+/* 故障原因表格整体容器 */
+.fault-reason-table {
+  display: flex;
+  flex-direction: column;
+  height: 400px;
+  /* 固定整个表格区域的高度 */
+}
+
+/* 故障原因筛选区域 */
+.fault-reason-filter {
+  flex-shrink: 0;
+  margin-bottom: 10px;
+}
+
+.filter-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.filter-options .el-button {
+  padding: 2px 5px;
+  font-size: 12px;
+}
+
+.filter-options .el-button.active {
+  background-color: #fef0f0;
+  color: #f56c6c;
+  border-radius: 3px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .fault-reason-table {
+    height: 350px;
+  }
+
+  .fault-reason-container {
+    height: 280px;
+  }
+
+  .fault-reason-container .table-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .filter-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
 }
 </style>

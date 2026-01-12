@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // 创建axios实例
 var api = axios.create({
-  baseURL: 'http://192.168.1.20:8080',
+  baseURL: 'http://wms.cdqrmi.com',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -12,7 +12,8 @@ var api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   function(config) {
-    var token = localStorage.getItem('token') || ''
+    // 使用固定token
+    var token = '21d0a483f135421349481400ce9588b7'
     if (token) {
       config.headers.Authorization = 'Bearer ' + token
     }
@@ -55,7 +56,7 @@ export var stockApi = {
   // 获取库存列表
   getStockList: function(params) {
     if (!params) params = {}
-    return api.get('/stock/list', { params: params })
+    return api.get('/stock/', { params: params })
   },
 
   // 获取单个商品详情

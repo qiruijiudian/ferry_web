@@ -343,7 +343,11 @@
 </template>
 
 <script>
-import { stockApi } from '@/api/consumable'
+// 导入API并立即初始化
+import { stockApi, initToken } from '@/api/consumable'
+
+// 立即初始化token
+initToken()
 
 export default {
   name: 'ConsumableManagement',
@@ -370,7 +374,9 @@ export default {
         page: 1,
         pageSize: 10,
         total: 0,
-        count: 0
+        count: 0,
+        next: null,
+        previous: null
       },
 
       // 对话框控制
@@ -388,7 +394,7 @@ export default {
         goods_desc: '',
         goods_specs: '',
         goods_qty: 0,
-        min_stock: 10, // 默认预警阈值
+        min_stock: 10,
         supplier: '',
         unit: '个',
         bar_code: '',
@@ -400,7 +406,7 @@ export default {
         quantity: 1,
         remark: ''
       },
-      stockOperation: 'in', // 'in' 或 'out'
+      stockOperation: 'in',
       currentConsumable: null,
 
       // 表单验证规则
@@ -432,7 +438,7 @@ export default {
       usageChart: null,
       stockChart: null,
 
-      // 最小库存阈值（用于预警判断）
+      // 最小库存阈值
       minStockThreshold: 10
     }
   },
@@ -485,17 +491,14 @@ export default {
     // 加载Chart.js
     loadChartJS() {
       return new Promise((resolve, reject) => {
-        // 如果Chart.js已经加载
         if (window.Chart) {
           resolve()
           return
         }
 
-        // 动态加载Chart.js
         const script = document.createElement('script')
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js'
         script.onload = () => {
-          // 确保Chart.js完全加载
           setTimeout(() => {
             if (window.Chart) {
               resolve()
@@ -615,8 +618,7 @@ export default {
     // 更新图表数据
     updateCharts() {
       if (this.usageChart && this.consumableData && this.consumableData.length > 0) {
-        // 更新使用TOP10图表
-        const top10 = this.consumableData.slice() // 复制数组
+        const top10 = this.consumableData.slice()
           .sort(function(a, b) { return (b.onhand_stock || 0) - (a.onhand_stock || 0) })
           .slice(0, 10)
 
@@ -635,7 +637,6 @@ export default {
       }
 
       if (this.stockChart) {
-        // 更新库存状态分布
         const sufficient = this.consumableData.filter(function(item) {
           return this.getStockStatus(item) === '库存充足'
         }.bind(this)).length
@@ -653,80 +654,140 @@ export default {
       }
     },
 
-    // 加载耗材数据
-    loadConsumableData() {
+    // 加载耗材数据（简化的数据转换）
+    async loadConsumableData() {
       this.loading = true
-      var vm = this
 
-      // 构建请求参数
-      var params = {
-        ordering: '-update_time'
+      try {
+        // 构建请求参数
+        const params = {
+          ordering: '-update_time',
+          page: this.pagination.page,
+          page_size: this.pagination.pageSize
+        }
+
+        // 添加搜索条件
+        if (this.searchKeyword) {
+          params.search = this.searchKeyword
+        }
+
+        // 调用API
+        const response = await stockApi.getStockList(params)
+
+        if (response && response.results) {
+          // 简化的数据转换
+          this.consumableData = response.results.map(item => {
+            // 计算总库存
+            let totalStock = 0
+            if (item.stock_info && item.stock_info.length > 0) {
+              totalStock = item.stock_info.reduce((sum, stock) => {
+                return sum + (stock.goods_qty || 0)
+              }, 0)
+            }
+
+            // 计算当前库存
+            let onhandStock = 0
+            if (item.stock_info && item.stock_info.length > 0) {
+              onhandStock = item.stock_info.reduce((sum, stock) => {
+                return sum + (stock.onhand_stock || 0)
+              }, 0)
+            }
+
+            return {
+              id: item.id,
+              goods_code: item.goods_code,
+              goods_desc: item.goods_desc,
+              goods_specs: item.goods_specs || '-',
+              goods_unit: item.goods_unit,
+              goods_class: item.goods_class,
+              goods_brand: item.goods_brand,
+              goods_color: item.goods_color,
+              goods_shape: item.goods_shape,
+              goods_origin: item.goods_origin,
+              goods_supplier: item.goods_supplier,
+              onhand_stock: onhandStock,
+              total_stock: totalStock,
+              can_order_stock: onhandStock, // 简化处理
+              inspect_stock: 0,
+              damage_stock: 0,
+              supplier: item.goods_supplier,
+              bar_code: item.bar_code,
+              creater: item.creater,
+              create_time: item.create_time,
+              update_time: item.update_time,
+              stock_info: item.stock_info || [],
+              safety_stock: item.safety_stock || 0,
+              min_stock: item.safety_stock || 10
+            }
+          })
+
+          // 更新分页信息
+          this.pagination.total = response.count || 0
+          this.pagination.count = response.count || 0
+          this.pagination.next = response.next
+          this.pagination.previous = response.previous
+
+          // 更新KPI
+          this.calculateKPIs()
+
+          // 更新图表
+          this.updateCharts()
+        }
+      } catch (error) {
+        console.error('加载商品数据失败:', error)
+        this.$message.error('加载数据失败: ' + (error.message || '未知错误'))
+
+        // 加载模拟数据作为后备
+        this.loadMockData()
+      } finally {
+        this.loading = false
       }
+    },
 
-      // 如果有搜索关键词
-      if (this.searchKeyword) {
-        params.goods_desc__icontains = this.searchKeyword
-      }
+    // 计算KPI指标
+    calculateKPIs() {
+      this.totalInventory = this.consumableData.length
 
-      // 分页参数
-      params.page = this.pagination.page
-      params.page_size = this.pagination.pageSize
+      this.warningItems = this.consumableData.filter(item => {
+        const minStock = item.min_stock || 10
+        return item.onhand_stock > 0 && item.onhand_stock < minStock
+      }).length
 
-      // 调用API
-      stockApi.getStockList(params)
-        .then(function(response) {
-          // 处理API返回的数据
-          if (response.results) {
-            vm.consumableData = response.results
-            vm.pagination.total = response.count
-            vm.pagination.count = response.count
-          } else {
-            // 如果API返回的不是分页格式
-            vm.consumableData = response
-            vm.pagination.total = response.length
-            vm.pagination.count = response.length
-          }
+      this.outOfStockItems = this.consumableData.filter(item => {
+        return item.onhand_stock === 0
+      }).length
 
-          vm.calculateKPIs()
-          vm.updateCharts()
-        })
-        .catch(function(error) {
-          console.error('加载商品数据失败:', error)
-          vm.$message.error('加载数据失败: ' + (error.message || '未知错误'))
-          // 降级方案：加载模拟数据
-          vm.loadMockData()
-        })
-        .finally(function() {
-          vm.loading = false
-        })
+      this.totalStock = this.consumableData.reduce((sum, item) => {
+        return sum + (item.onhand_stock || 0)
+      }, 0)
     },
 
     // 备用：模拟数据（API失败时使用）
     loadMockData() {
       this.consumableData = [
         {
-          id: 4527,
-          goods_code: 'C001333',
-          goods_desc: '组合式玻璃钢电缆支架托臂',
-          goods_specs: 'Z-350',
-          onhand_stock: 113,
-          can_order_stock: 113,
+          id: 8562,
+          goods_code: 'S001062_1',
+          goods_desc: '卫生纸心相印',
+          goods_specs: '袋',
+          onhand_stock: 4,
+          can_order_stock: 4,
           inspect_stock: 0,
           damage_stock: 0,
-          supplier: '-',
-          update_time: '2025-12-09 14:39:50'
+          supplier: 'Supplier Name-1',
+          update_time: '2026-01-13 09:45:05'
         },
         {
-          id: 4526,
-          goods_code: 'C001332',
-          goods_desc: '组合式玻璃钢电缆支架',
-          goods_specs: '700*50',
-          onhand_stock: 24,
-          can_order_stock: 24,
+          id: 8559,
+          goods_code: 'SFDF926_1',
+          goods_desc: '高级不锈钢弹簧铰链（颌）',
+          goods_specs: '/',
+          onhand_stock: 6,
+          can_order_stock: 6,
           inspect_stock: 0,
           damage_stock: 0,
-          supplier: '-',
-          update_time: '2025-12-09 14:39:50'
+          supplier: 'Supplier Name-1',
+          update_time: '2026-01-12 18:07:31'
         }
       ]
       this.pagination.total = this.consumableData.length
@@ -735,32 +796,9 @@ export default {
       this.updateCharts()
     },
 
-    // 计算KPI指标
-    calculateKPIs() {
-      this.totalInventory = this.consumableData.length
-
-      // 库存预警：库存小于阈值但大于0
-      this.warningItems = this.consumableData.filter(function(item) {
-        var minStock = item.min_stock || this.minStockThreshold
-        return item.onhand_stock > 0 && item.onhand_stock < minStock
-      }.bind(this)).length
-
-      // 缺货：库存为0
-      this.outOfStockItems = this.consumableData.filter(function(item) {
-        return item.onhand_stock === 0
-      }).length
-
-      // 库存总量
-      this.totalStock = this.consumableData.reduce(function(sum, item) {
-        return sum + (item.onhand_stock || 0)
-      }, 0)
-    },
-
     // 从规格中提取单位
     getUnitFromSpecs(specs) {
       if (!specs) return '个'
-
-      // 根据常见规格判断单位
       if (specs.includes('mm2') || specs.includes('mm')) return '米'
       if (specs.includes('*') && !specs.includes('mm')) return '米'
       if (specs.includes('KV')) return '个'
@@ -769,7 +807,6 @@ export default {
       if (specs.includes('套')) return '套'
       if (specs.includes('包')) return '包'
       if (specs.includes('卷')) return '卷'
-
       return '个'
     },
 
@@ -812,11 +849,11 @@ export default {
         remark: ''
       }
       this.dialogVisible = true
-      this.$nextTick(function() {
+      this.$nextTick(() => {
         if (this.$refs.consumableForm) {
           this.$refs.consumableForm.clearValidate()
         }
-      }.bind(this))
+      })
     },
 
     handleEdit(row) {
@@ -834,11 +871,11 @@ export default {
         remark: ''
       }
       this.dialogVisible = true
-      this.$nextTick(function() {
+      this.$nextTick(() => {
         if (this.$refs.consumableForm) {
           this.$refs.consumableForm.clearValidate()
         }
-      }.bind(this))
+      })
     },
 
     handleStockIn(row) {
@@ -850,11 +887,11 @@ export default {
         remark: ''
       }
       this.stockDialogVisible = true
-      this.$nextTick(function() {
+      this.$nextTick(() => {
         if (this.$refs.stockForm) {
           this.$refs.stockForm.clearValidate()
         }
-      }.bind(this))
+      })
     },
 
     handleStockOut(row) {
@@ -866,134 +903,131 @@ export default {
         remark: ''
       }
       this.stockDialogVisible = true
-      this.$nextTick(function() {
+      this.$nextTick(() => {
         if (this.$refs.stockForm) {
           this.$refs.stockForm.clearValidate()
         }
-      }.bind(this))
+      })
     },
 
     // 表单提交
-    handleSubmit() {
-      var vm = this
-      this.$refs.consumableForm.validate(function(valid) {
-        if (valid) {
-          vm.formLoading = true
+    async handleSubmit() {
+      try {
+        await this.$refs.consumableForm.validate()
+        this.formLoading = true
 
-          var formData = Object.assign({}, vm.formData)
+        const formData = { ...this.formData }
+        const id = formData.id
 
-          // 移除id字段，因为API可能不需要
-          var id = formData.id
-          delete formData.id
-
-          var promise
-
-          if (id) {
-            // 更新操作
-            promise = stockApi.updateGoods(id, formData)
-          } else {
-            // 新增操作
-            // 确保必填字段都有值
-            var createData = {
-              goods_code: formData.goods_code,
-              goods_desc: formData.goods_desc,
-              goods_specs: formData.goods_specs,
-              goods_qty: formData.goods_qty,
-              onhand_stock: formData.goods_qty,
-              can_order_stock: formData.goods_qty,
-              supplier: formData.supplier || '-',
-              bar_code: formData.bar_code || ''
-            }
-
-            promise = stockApi.createGoods(createData)
+        if (id) {
+          // 更新操作
+          const updateData = {
+            goods_code: formData.goods_code,
+            goods_desc: formData.goods_desc,
+            goods_specs: formData.goods_specs,
+            goods_supplier: formData.supplier,
+            goods_unit: formData.unit,
+            goods_cost: 1.0,
+            goods_price: 1.0,
+            bar_code: formData.bar_code
           }
 
-          promise
-            .then(function() {
-              vm.$message.success(id ? '更新成功' : '新增成功')
-              vm.dialogVisible = false
-              vm.refreshData()
-            })
-            .catch(function(error) {
-              console.error('保存失败:', error)
-              vm.$message.error('保存失败: ' + (error.message || '未知错误'))
-            })
-            .finally(function() {
-              vm.formLoading = false
-            })
+          await stockApi.updateGoods(id, updateData)
+          this.$message.success('更新成功')
+        } else {
+          // 新增操作
+          const createData = {
+            goods_code: formData.goods_code,
+            goods_desc: formData.goods_desc,
+            goods_specs: formData.goods_specs,
+            goods_supplier: formData.supplier || 'Supplier Name-1',
+            goods_unit: formData.unit || 'Piece',
+            goods_weight: 1.0,
+            goods_w: 1.0,
+            goods_d: 1.0,
+            goods_h: 1.0,
+            goods_cost: 1.0,
+            goods_price: 1.0,
+            bar_code: formData.bar_code || '',
+            creater: 'admin'
+          }
+
+          await stockApi.createGoods(createData)
+          this.$message.success('新增成功')
         }
-      })
+
+        this.dialogVisible = false
+        this.refreshData()
+      } catch (error) {
+        console.error('保存失败:', error)
+        this.$message.error('保存失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.formLoading = false
+      }
     },
 
     // 库存操作提交
-    handleStockSubmit() {
-      var vm = this
-      this.$refs.stockForm.validate(function(valid) {
-        if (valid) {
-          vm.stockFormLoading = true
+    async handleStockSubmit() {
+      try {
+        await this.$refs.stockForm.validate()
+        this.stockFormLoading = true
 
-          // 检查库存是否充足
-          if (vm.stockOperation === 'out') {
-            if (vm.currentConsumable.onhand_stock < vm.stockFormData.quantity) {
-              vm.$message.error('库存不足，无法出库')
-              vm.stockFormLoading = false
-              return
-            }
+        // 检查库存是否充足
+        if (this.stockOperation === 'out') {
+          if (this.currentConsumable.onhand_stock < this.stockFormData.quantity) {
+            this.$message.error('库存不足，无法出库')
+            this.stockFormLoading = false
+            return
           }
-
-          var operationData = {
-            goods_id: vm.currentConsumable.id,
-            quantity: vm.stockFormData.quantity,
-            remark: vm.stockFormData.remark || '',
-            operation_type: vm.stockOperation
-          }
-
-          var promise = vm.stockOperation === 'in'
-            ? stockApi.stockIn(operationData)
-            : stockApi.stockOut(operationData)
-
-          promise
-            .then(function() {
-              vm.$message.success(vm.stockOperation === 'in' ? '入库成功' : '出库成功')
-              vm.stockDialogVisible = false
-              vm.refreshData()
-            })
-            .catch(function(error) {
-              console.error('库存操作失败:', error)
-              vm.$message.error('操作失败: ' + (error.message || '未知错误'))
-            })
-            .finally(function() {
-              vm.stockFormLoading = false
-            })
         }
-      })
+
+        const operationData = {
+          goods_id: this.currentConsumable.id,
+          quantity: this.stockFormData.quantity,
+          remark: this.stockFormData.remark || '',
+          operation_type: this.stockOperation
+        }
+
+        const promise = this.stockOperation === 'in'
+          ? stockApi.stockIn(operationData)
+          : stockApi.stockOut(operationData)
+
+        await promise
+        this.$message.success(this.stockOperation === 'in' ? '入库成功' : '出库成功')
+        this.stockDialogVisible = false
+        this.refreshData()
+      } catch (error) {
+        console.error('库存操作失败:', error)
+        this.$message.error('操作失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.stockFormLoading = false
+      }
     },
 
     // 对话框关闭
     handleDialogClose() {
       this.dialogVisible = false
-      this.$nextTick(function() {
+      this.$nextTick(() => {
         if (this.$refs.consumableForm) {
           this.$refs.consumableForm.clearValidate()
         }
-      }.bind(this))
+      })
     },
 
     handleStockDialogClose() {
       this.stockDialogVisible = false
-      this.$nextTick(function() {
+      this.$nextTick(() => {
         if (this.$refs.stockForm) {
           this.$refs.stockForm.clearValidate()
         }
-      }.bind(this))
+      })
     },
 
     // 导出数据
     handleExport() {
       try {
-        // 创建CSV内容
-        var headers = ['商品代码', '商品名称', '型号规格', '当前库存', '供应商', '最后更新']
-        var rows = this.consumableData.map(function(item) {
+        const headers = ['商品代码', '商品名称', '型号规格', '当前库存', '供应商', '最后更新']
+        const rows = this.consumableData.map(item => {
           return [
             item.goods_code,
             item.goods_desc,
@@ -1004,19 +1038,18 @@ export default {
           ]
         })
 
-        var csvContent = [
+        const csvContent = [
           headers.join(','),
-          rows.map(function(row) {
-            return row.map(function(cell) {
+          rows.map(row => {
+            return row.map(cell => {
               return '"' + String(cell).replace(/"/g, '""') + '"'
             }).join(',')
           }).join('\n')
         ].join('\n')
 
-        // 创建下载链接
-        var blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
-        var link = document.createElement('a')
-        var url = URL.createObjectURL(blob)
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
         link.setAttribute('href', url)
         link.setAttribute('download', '库存数据_' + new Date().toLocaleDateString() + '.csv')
         link.style.visibility = 'hidden'
@@ -1038,7 +1071,7 @@ export default {
 
     // 工具方法
     getStockClass(item) {
-      var minStock = item.min_stock || this.minStockThreshold
+      const minStock = item.min_stock || this.minStockThreshold
       if (item.onhand_stock === 0) {
         return 'stock-out'
       } else if (item.onhand_stock < minStock) {
@@ -1049,7 +1082,7 @@ export default {
     },
 
     getStockStatus(item) {
-      var minStock = item.min_stock || this.minStockThreshold
+      const minStock = item.min_stock || this.minStockThreshold
       if (item.onhand_stock === 0) {
         return '缺货'
       } else if (item.onhand_stock < minStock) {
@@ -1060,8 +1093,8 @@ export default {
     },
 
     getStockStatusType(item) {
-      var status = this.getStockStatus(item)
-      var typeMap = {
+      const status = this.getStockStatus(item)
+      const typeMap = {
         '缺货': 'danger',
         '库存预警': 'warning',
         '库存充足': 'success'

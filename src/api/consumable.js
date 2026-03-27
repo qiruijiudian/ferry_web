@@ -2,21 +2,20 @@ import axios from 'axios'
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'https://wms.cdqrmi.com',
+  baseURL: 'https://order.cdqrmi.com/api/v1',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
-    'token': '21d0a483f135421349481400ce9588b7' // 这里直接写死token
+    'Authorization': 'Bearer 21d0a483f135421349481400ce9588b7'
   }
 })
 
 // 请求拦截器（简化，直接使用固定的token）
 api.interceptors.request.use(
   function(config) {
-    // 直接使用固定token，不再从localStorage获取
-    // 如果需要，也可以在这里添加固定的token
-    if (!config.headers.token) {
-      config.headers.token = '21d0a483f135421349481400ce9588b7'
+    // 确保Authorization头存在
+    if (!config.headers['Authorization']) {
+      config.headers['Authorization'] = 'Bearer 21d0a483f135421349481400ce9588b7'
     }
     return config
   },
@@ -58,126 +57,81 @@ api.interceptors.response.use(
   }
 )
 
-// 商品管理相关API
-export const goodsApi = {
-  // 获取商品列表（支持分页）
-  getGoodsList: function(params) {
+// 初始化token（保持兼容）
+export function initToken() {
+  console.log('Token already initialized in API interceptor')
+}
+
+// 耗材管理相关API（从工单系统获取材料信息）
+export const consumableApi = {
+  // 获取工单列表（用于提取材料信息）
+  getWorkOrderList: function(params) {
     if (!params) params = {}
-    return api.get('/goods/', { params: params })
+    return api.get('/analysis/list', { params: params })
   },
 
-  // 获取单个商品详情
-  getGoodsDetail: function(id) {
-    return api.get(`/goods/${id}/`)
-  },
-
-  // 新增商品
-  createGoods: function(data) {
-    return api.post('/goods/create/', data)
-  },
-
-  // 更新商品
-  updateGoods: function(id, data) {
-    return api.put(`/goods/${id}/update/`, data)
-  },
-
-  // 删除商品
-  deleteGoods: function(id) {
-    return api.delete(`/goods/${id}/delete/`)
-  },
-
-  // 获取商品相关列表（单位、分类、品牌等）
-  getGoodsOptions: function() {
-    return api.get('/goods/options/')
+  // 获取工单统计信息
+  getWorkOrderAnalysis: function(params) {
+    if (!params) params = {}
+    return api.get('/analysis', { params: params })
   }
 }
 
-// 为了兼容现有代码，同时导出stockApi
+// 为了兼容现有代码，同时导出stockApi（已废弃，仅用于兼容）
 export const stockApi = {
-  // 获取库存列表 - 使用商品接口
+  // 获取库存列表 - 已废弃，请使用consumableApi.getWorkOrderList
   getStockList: function(params) {
-    if (!params) params = {}
-    // 确保token存在
-    if (!api.defaults.headers['token']) {
-      api.defaults.headers['token'] = '21d0a483f135421349481400ce9588b7'
-    }
-    return api.get('/goods/', { params: params })
+    console.warn('stockApi.getStockList已废弃，请使用consumableApi.getWorkOrderList')
+    return consumableApi.getWorkOrderList(params)
   },
 
-  // 获取单个商品详情
+  // 获取单个商品详情 - 已废弃
   getStockDetail: function(id) {
-    return api.get(`/goods/${id}/`)
+    console.warn('stockApi.getStockDetail已废弃')
+    return Promise.resolve({})
   },
 
-  // 新增商品
+  // 新增商品 - 已废弃
   createGoods: function(data) {
-    // 根据API文档调整字段映射
-    const postData = {
-      goods_code: data.goods_code,
-      goods_desc: data.goods_desc,
-      goods_specs: data.goods_specs || '-',
-      goods_supplier: data.supplier || 'Supplier Name-1',
-      goods_weight: data.goods_weight || 1.0,
-      goods_w: data.goods_w || 1.0,
-      goods_d: data.goods_d || 1.0,
-      goods_h: data.goods_h || 1.0,
-      goods_unit: data.unit || 'Piece',
-      goods_class: 'Industrial',
-      goods_brand: 'Brand Name-1',
-      goods_color: 'Indigo',
-      goods_shape: 'Cylinder',
-      goods_origin: 'Kamba_1',
-      goods_cost: data.goods_cost || 1.0,
-      goods_price: data.goods_price || 1.0,
-      bar_code: data.bar_code || '',
-      creater: 'admin'
-    }
-    return api.post('/goods/create/', postData)
+    console.warn('stockApi.createGoods已废弃')
+    return Promise.resolve({ success: true })
   },
 
-  // 更新商品
+  // 更新商品 - 已废弃
   updateGoods: function(id, data) {
-    const updateData = {
-      goods_code: data.goods_code,
-      goods_desc: data.goods_desc,
-      goods_specs: data.goods_specs || '-',
-      goods_supplier: data.supplier || 'Supplier Name-1',
-      goods_weight: data.goods_weight || 1.0,
-      goods_unit: data.unit || 'Piece',
-      goods_cost: data.goods_cost || 1.0,
-      goods_price: data.goods_price || 1.0,
-      bar_code: data.bar_code || ''
-    }
-    return api.put(`/goods/${id}/update/`, updateData)
+    console.warn('stockApi.updateGoods已废弃')
+    return Promise.resolve({ success: true })
   },
 
-  // 删除商品
+  // 删除商品 - 已废弃
   deleteGoods: function(id) {
-    return api.delete(`/goods/${id}/delete/`)
+    console.warn('stockApi.deleteGoods已废弃')
+    return Promise.resolve({ success: true })
   },
 
-  // 入库操作 - 需要根据实际API调整
+  // 入库操作 - 已废弃
   stockIn: function(data) {
-    console.log('入库操作:', data)
-    return Promise.resolve({ success: true, message: '入库成功' })
+    console.warn('stockApi.stockIn已废弃')
+    return Promise.resolve({ success: true, message: '功能已调整' })
   },
 
-  // 出库操作 - 需要根据实际API调整
+  // 出库操作 - 已废弃
   stockOut: function(data) {
-    console.log('出库操作:', data)
-    return Promise.resolve({ success: true, message: '出库成功' })
+    console.warn('stockApi.stockOut已废弃')
+    return Promise.resolve({ success: true, message: '功能已调整' })
+  },
+
+  // 获取商品种类列表 - 已废弃
+  getGoodsSortList: function(params) {
+    console.warn('stockApi.getGoodsSortList已废弃，请使用consumableApi')
+    return Promise.resolve([])
+  },
+
+  // 或者单独获取count - 已废弃
+  getGoodsSortCount: function() {
+    console.warn('stockApi.getGoodsSortCount已废弃')
+    return Promise.resolve({ count: 0 })
   }
 }
-
-// 在页面加载时自动设置token
-export const initToken = function() {
-  const token = '21d0a483f135421349481400ce9588b7'
-  api.defaults.headers['token'] = token
-  localStorage.setItem('wms_token', token) // 同时也存到localStorage
-  console.log('Token已初始化')
-}
-
-// 立即初始化token
-initToken()
 
 export default api

@@ -1,8 +1,8 @@
 <template>
   <div class="consumable-management">
     <div class="header">
-      <h1><i class="el-icon-box" /> 耗材与仓库管理系统</h1>
-      <div class="subtitle">耗材库存、使用记录、采购管理一体化平台</div>
+      <h1><i class="el-icon-box" /> 工单材料概览</h1>
+      <div class="subtitle">从工单系统提取的材料信息</div>
     </div>
 
     <!-- 筛选和操作区域 -->
@@ -10,23 +10,38 @@
       <div class="filter-group">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索商品名称、型号、代码..."
+          placeholder="搜索材料名称或工单ID..."
           prefix-icon="el-icon-search"
           style="width: 300px;"
           clearable
           @clear="handleSearch"
           @keyup.enter="handleSearch"
         />
-        <el-select v-model="filterStatus" placeholder="库存状态" clearable @change="handleFilter">
-          <el-option label="库存充足" value="sufficient" />
-          <el-option label="库存预警" value="warning" />
-          <el-option label="缺货" value="outOfStock" />
+        <el-select v-model="filterStatus" placeholder="使用状态" clearable @change="handleFilter">
+          <el-option label="使用充足" value="sufficient" />
+          <el-option label="使用预警" value="warning" />
+          <el-option label="未使用" value="outOfStock" />
         </el-select>
+        <el-select v-model="timePeriod" placeholder="统计周期" @change="handleTimePeriodChange">
+          <el-option label="按日" value="day" />
+          <el-option label="按周" value="week" />
+          <el-option label="按月" value="month" />
+          <el-option label="按年" value="year" />
+        </el-select>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          style="width: 240px"
+          @change="handleDateRangeChange"
+        />
       </div>
       <div class="action-group">
-        <el-button type="primary" icon="el-icon-plus" @click="handleAdd">
+        <!-- <el-button type="primary" icon="el-icon-plus" @click="handleAdd">
           新增商品
-        </el-button>
+        </el-button> -->
         <el-button type="success" icon="el-icon-download" @click="handleExport">
           导出数据
         </el-button>
@@ -44,8 +59,8 @@
             <i class="el-icon-box" />
           </div>
           <div class="kpi-info">
-            <div class="kpi-value">{{ totalInventory }}</div>
-            <div class="kpi-label">总库存种类</div>
+            <div class="kpi-value">{{ pagination.total }}</div>
+            <div class="kpi-label">工单总数</div>
           </div>
         </div>
       </el-card>
@@ -55,8 +70,8 @@
             <i class="el-icon-warning" />
           </div>
           <div class="kpi-info">
-            <div class="kpi-value">{{ warningItems }}</div>
-            <div class="kpi-label">库存预警</div>
+            <div class="kpi-value">{{ goodsTypesCount }}<span class="kpi-unit">种耗材</span></div>
+            <div class="kpi-label">材料种类</div>
           </div>
         </div>
       </el-card>
@@ -66,8 +81,8 @@
             <i class="el-icon-close" />
           </div>
           <div class="kpi-info">
-            <div class="kpi-value">{{ outOfStockItems }}</div>
-            <div class="kpi-label">缺货物品</div>
+            <div class="kpi-value kpi-text-small">{{ mostFrequentConsumable.name || '-' }}</div>
+            <div class="kpi-label">{{ mostFrequentConsumable.count || 0 }}次</div>
           </div>
         </div>
       </el-card>
@@ -77,18 +92,44 @@
             <i class="el-icon-s-data" />
           </div>
           <div class="kpi-info">
-            <div class="kpi-value">{{ totalStock }}</div>
-            <div class="kpi-label">库存总量</div>
+            <div class="kpi-value kpi-text-small">{{ mostQuantityConsumable.name || '-' }}</div>
+            <div class="kpi-label">{{ mostQuantityConsumable.quantity || 0 }}{{ mostQuantityConsumable.unit || '' }}
+            </div>
           </div>
         </div>
       </el-card>
     </div>
 
-    <!-- 耗材列表 -->
-    <el-card class="main-card">
+    <!-- 搜索结果区域 -->
+    <el-card
+      v-if="searchKeyword && getConsumableSearchResults().length > 0"
+      class="main-card"
+      style="margin-bottom: 20px;"
+    >
       <template #header>
         <div class="card-header">
-          <span>商品库存列表</span>
+          <span>耗材搜索结果</span>
+        </div>
+      </template>
+      <el-table :data="getConsumableSearchResults()" style="width: 100%" stripe border>
+        <el-table-column prop="name" label="材料名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="count" label="使用次数" width="120" align="center" />
+        <el-table-column prop="totalUsage" label="总消耗量" width="120" align="center" />
+        <el-table-column label="操作" width="150" align="center">
+          <template slot-scope="scope">
+            <el-button size="mini" type="primary" @click="showConsumableWorkOrders(scope.row)">
+              查看工单
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 耗材列表 -->
+    <el-card v-if="!searchKeyword || getConsumableSearchResults().length === 0" class="main-card">
+      <template #header>
+        <div class="card-header">
+          <span>材料使用列表</span>
           <div class="header-actions">
             <el-button
               v-if="consumableData.length > 10 && !showAllItems"
@@ -98,14 +139,10 @@
             >
               展开全部 {{ consumableData.length }} 条数据
             </el-button>
-            <el-button
-              v-if="consumableData.length > 10 && showAllItems"
-              type="text"
-              icon="el-icon-arrow-up"
-              @click="showAllItems = false"
-            >
+            <!-- <el-button v-if="consumableData.length > 10 && showAllItems" type="text" icon="el-icon-arrow-up"
+              @click="showAllItems = false">
               收起至前10条
-            </el-button>
+            </el-button> -->
           </div>
         </div>
       </template>
@@ -118,41 +155,30 @@
         stripe
         border
       >
-        <el-table-column prop="goods_code" label="商品代码" width="120" fixed="left" />
-        <el-table-column prop="goods_desc" label="商品名称" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="goods_specs" label="型号规格" width="150" show-overflow-tooltip />
-        <el-table-column prop="onhand_stock" label="当前库存" width="110" align="center">
+        <el-table-column prop="goods_code" label="工单ID" width="120" fixed="left" />
+        <el-table-column prop="goods_desc" label="材料名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="goods_specs" label="工单类型" width="150" show-overflow-tooltip />
+        <el-table-column prop="onhand_stock" label="使用次数" width="110" align="center">
           <template slot-scope="scope">
             <span :class="getStockClass(scope.row)">
-              {{ scope.row.onhand_stock }} {{ getUnitFromSpecs(scope.row.goods_specs) }}
+              {{ scope.row.onhand_stock }} 次
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="可订购库存" width="110" align="center">
+        <el-table-column label="工单负责人" width="110" align="center">
           <template slot-scope="scope">
-            {{ scope.row.can_order_stock || 0 }}
+            {{ scope.row.supplier || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="库存状态" width="120" align="center">
+        <el-table-column label="使用状态" width="120" align="center">
           <template slot-scope="scope">
             <el-tag :type="getStockStatusType(scope.row)" size="small">
               {{ getStockStatus(scope.row) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="supplier" label="供应商" width="150" show-overflow-tooltip />
-        <el-table-column label="质检库存" width="110" align="center">
-          <template slot-scope="scope">
-            {{ scope.row.inspect_stock || 0 }}
-          </template>
-        </el-table-column>
-        <el-table-column label="损坏库存" width="110" align="center">
-          <template slot-scope="scope">
-            {{ scope.row.damage_stock || 0 }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="update_time" label="最后更新" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="update_time" label="最后使用" width="180" />
+        <!-- <el-table-column label="操作" width="200" fixed="right">
           <template slot-scope="scope">
             <el-button size="mini" @click="handleEdit(scope.row)">
               编辑
@@ -160,27 +186,23 @@
             <el-button size="mini" type="success" @click="handleStockIn(scope.row)">
               入库
             </el-button>
-            <el-button
-              size="mini"
-              type="warning"
-              :disabled="scope.row.onhand_stock <= 0"
-              @click="handleStockOut(scope.row)"
-            >
+            <el-button size="mini" type="warning" :disabled="scope.row.onhand_stock <= 0"
+              @click="handleStockOut(scope.row)">
               出库
             </el-button>
           </template>
-        </el-table-column>
+        </el-table-column> -->
       </el-table>
 
       <!-- 分页控件 -->
       <div v-if="pagination.total > pagination.pageSize" class="pagination-container">
         <el-pagination
           background
-          layout="prev, pager, next, sizes, total"
+          layout="prev, pager, next, sizes, total, jumper"
           :total="pagination.total"
           :page-size="pagination.pageSize"
           :current-page="pagination.page"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[30]"
           @size-change="handleSizeChange"
           @current-change="handlePageChange"
         />
@@ -189,9 +211,9 @@
       <!-- 空状态 -->
       <div v-if="filteredData.length === 0 && !loading" class="empty-state">
         <i class="el-icon-box" />
-        <p>暂无商品数据</p>
-        <el-button type="primary" icon="el-icon-plus" @click="handleAdd">
-          添加第一个商品
+        <p>暂无材料数据</p>
+        <el-button type="primary" icon="el-icon-refresh" @click="loadConsumableData">
+          刷新数据
         </el-button>
       </div>
     </el-card>
@@ -202,7 +224,7 @@
         <el-col :span="12">
           <el-card class="chart-card">
             <template #header>
-              <span>库存商品TOP10</span>
+              <span>材料使用TOP10</span>
             </template>
             <div class="chart-container">
               <canvas ref="usageChart" />
@@ -212,7 +234,7 @@
         <el-col :span="12">
           <el-card class="chart-card">
             <template #header>
-              <span>库存状态分布</span>
+              <span>材料使用状态分布</span>
             </template>
             <div class="chart-container">
               <canvas ref="stockChart" />
@@ -220,15 +242,22 @@
           </el-card>
         </el-col>
       </el-row>
+      <el-row :gutter="20" style="margin-top: 20px;">
+        <el-col :span="24">
+          <el-card class="chart-card">
+            <template #header>
+              <span>材料消耗趋势</span>
+            </template>
+            <div class="chart-container">
+              <canvas ref="consumptionChart" />
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
     </div>
 
-    <!-- 商品操作对话框 -->
-    <el-dialog
-      :title="dialogTitle"
-      :visible.sync="dialogVisible"
-      width="600px"
-      :before-close="handleDialogClose"
-    >
+    <!-- 商品操作对话框（已废弃，工单系统不支持编辑） -->
+    <!-- <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="600px" :before-close="handleDialogClose">
       <el-form ref="consumableForm" :model="formData" :rules="formRules" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="12">
@@ -257,23 +286,13 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="初始库存" prop="goods_qty">
-              <el-input-number
-                v-model="formData.goods_qty"
-                :min="0"
-                :precision="0"
-                style="width: 100%"
-              />
+              <el-input-number v-model="formData.goods_qty" :min="0" :precision="0" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="预警阈值" prop="min_stock">
-              <el-input-number
-                v-model="formData.min_stock"
-                :min="0"
-                :precision="0"
-                style="width: 100%"
-                placeholder="低于此值预警"
-              />
+              <el-input-number v-model="formData.min_stock" :min="0" :precision="0" style="width: 100%"
+                placeholder="低于此值预警" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -290,12 +309,7 @@
           </el-col>
         </el-row>
         <el-form-item label="备注">
-          <el-input
-            v-model="formData.remark"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入备注信息"
-          />
+          <el-input v-model="formData.remark" type="textarea" :rows="3" placeholder="请输入备注信息" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -304,32 +318,20 @@
           确定
         </el-button>
       </template>
-    </el-dialog>
+    </el-dialog> -->
 
-    <!-- 入库/出库对话框 -->
-    <el-dialog
-      :title="stockDialogTitle"
-      :visible.sync="stockDialogVisible"
-      width="400px"
-      :before-close="handleStockDialogClose"
-    >
+    <!-- 入库/出库对话框（已废弃，工单系统不支持） -->
+    <!-- <el-dialog :title="stockDialogTitle" :visible.sync="stockDialogVisible" width="400px"
+      :before-close="handleStockDialogClose">
       <el-form ref="stockForm" :model="stockFormData" :rules="stockFormRules" label-width="80px">
         <el-form-item :label="stockOperation === 'in' ? '入库数量' : '出库数量'" prop="quantity">
-          <el-input-number
-            v-model="stockFormData.quantity"
-            :min="1"
+          <el-input-number v-model="stockFormData.quantity" :min="1"
             :max="stockOperation === 'out' && currentConsumable ? currentConsumable.onhand_stock : undefined"
-            :precision="0"
-            style="width: 100%"
-          />
+            :precision="0" style="width: 100%" />
         </el-form-item>
         <el-form-item label="备注" prop="remark">
-          <el-input
-            v-model="stockFormData.remark"
-            type="textarea"
-            :rows="3"
-            :placeholder="stockOperation === 'in' ? '请输入入库备注' : '请输入出库用途'"
-          />
+          <el-input v-model="stockFormData.remark" type="textarea" :rows="3"
+            :placeholder="stockOperation === 'in' ? '请输入入库备注' : '请输入出库用途'" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -338,13 +340,30 @@
           确定
         </el-button>
       </template>
+    </el-dialog> -->
+
+    <!-- 工单列表对话框 -->
+    <el-dialog
+      :title="'使用材料: ' + (currentConsumable ? currentConsumable.name : '')"
+      :visible.sync="workOrderDialogVisible"
+      width="800px"
+    >
+      <el-table :data="workOrders" style="width: 100%" stripe border>
+        <el-table-column prop="goods_code" label="工单ID" width="120" />
+        <el-table-column prop="work_order_type" label="工单类型" width="150" />
+        <el-table-column prop="principal" label="工单负责人" width="120" />
+        <el-table-column prop="create_time" label="创建时间" width="180" />
+      </el-table>
+      <template #footer>
+        <el-button @click="workOrderDialogVisible = false">关闭</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
 // 导入API并立即初始化
-import { stockApi, initToken } from '@/api/consumable'
+import { consumableApi, initToken } from '@/api/consumable'
 
 // 立即初始化token
 initToken()
@@ -366,6 +385,7 @@ export default {
       // KPI数据
       totalInventory: 0,
       warningItems: 0,
+      goodsTypesCount: 0, // 商品种类数（1063）
       outOfStockItems: 0,
       totalStock: 0,
 
@@ -379,67 +399,91 @@ export default {
         previous: null
       },
 
-      // 对话框控制
-      dialogVisible: false,
-      stockDialogVisible: false,
-      dialogTitle: '新增商品',
-      stockDialogTitle: '入库操作',
-      formLoading: false,
-      stockFormLoading: false,
+      // 对话框控制（已废弃，工单系统不支持）
+      // dialogVisible: false,
+      // stockDialogVisible: false,
+      // dialogTitle: '新增商品',
+      // stockDialogTitle: '入库操作',
+      // formLoading: false,
+      // stockFormLoading: false,
 
-      // 表单数据
-      formData: {
-        id: null,
-        goods_code: '',
-        goods_desc: '',
-        goods_specs: '',
-        goods_qty: 0,
-        min_stock: 10,
-        supplier: '',
-        unit: '个',
-        bar_code: '',
-        remark: ''
-      },
+      // 表单数据（已废弃）
+      // formData: {
+      //   id: null,
+      //   goods_code: '',
+      //   goods_desc: '',
+      //   goods_specs: '',
+      //   goods_qty: 0,
+      //   min_stock: 10,
+      //   supplier: '',
+      //   unit: '个',
+      //   bar_code: '',
+      //   remark: ''
+      // },
 
-      // 库存操作数据
-      stockFormData: {
-        quantity: 1,
-        remark: ''
-      },
-      stockOperation: 'in',
-      currentConsumable: null,
+      // 库存操作数据（已废弃）
+      // stockFormData: {
+      //   quantity: 1,
+      //   remark: ''
+      // },
+      // stockOperation: 'in',
+      // currentConsumable: null,
 
-      // 表单验证规则
-      formRules: {
-        goods_code: [
-          { required: true, message: '请输入商品代码', trigger: 'blur' }
-        ],
-        goods_desc: [
-          { required: true, message: '请输入商品名称', trigger: 'blur' }
-        ],
-        goods_qty: [
-          { required: true, message: '请输入初始库存', trigger: 'blur' },
-          { type: 'number', min: 0, message: '库存不能为负数', trigger: 'blur' }
-        ],
-        min_stock: [
-          { required: true, message: '请输入预警阈值', trigger: 'blur' },
-          { type: 'number', min: 0, message: '预警阈值不能为负数', trigger: 'blur' }
-        ]
-      },
+      // 表单验证规则（已废弃）
+      // formRules: {
+      //   goods_code: [
+      //     { required: true, message: '请输入商品代码', trigger: 'blur' }
+      //   ],
+      //   goods_desc: [
+      //     { required: true, message: '请输入商品名称', trigger: 'blur' }
+      //   ],
+      //   goods_qty: [
+      //     { required: true, message: '请输入初始库存', trigger: 'blur' },
+      //     { type: 'number', min: 0, message: '库存不能为负数', trigger: 'blur' }
+      //   ],
+      //   min_stock: [
+      //     { required: true, message: '请输入预警阈值', trigger: 'blur' },
+      //     { type: 'number', min: 0, message: '预警阈值不能为负数', trigger: 'blur' }
+      //   ]
+      // },
 
-      stockFormRules: {
-        quantity: [
-          { required: true, message: '请输入数量', trigger: 'blur' },
-          { type: 'number', min: 1, message: '数量必须大于0', trigger: 'blur' }
-        ]
-      },
+      // stockFormRules: {
+      //   quantity: [
+      //     { required: true, message: '请输入数量', trigger: 'blur' },
+      //     { type: 'number', min: 1, message: '数量必须大于0', trigger: 'blur' }
+      //   ]
+      // },
 
       // 图表实例
       usageChart: null,
       stockChart: null,
+      consumptionChart: null,
 
       // 最小库存阈值
-      minStockThreshold: 10
+      minStockThreshold: 10,
+
+      // 时间周期统计
+      timePeriod: 'day', // day, week, month, year
+      timeBasedConsumption: [],
+
+      // 工单列表对话框
+      workOrderDialogVisible: false,
+      currentConsumable: null,
+      workOrders: [],
+
+      // 日期范围
+      dateRange: [],
+
+      // KPI统计数据
+      mostFrequentConsumable: {
+        name: '',
+        count: 0
+      },
+      mostQuantityConsumable: {
+        name: '',
+        quantity: 0,
+        unit: ''
+      }
     }
   },
   computed: {
@@ -472,6 +516,7 @@ export default {
   },
   mounted() {
     this.loadConsumableData()
+    this.loadGoodsTypesCount() // 新增：加载商品种类数
     this.loadChartJS().then(() => {
       this.$nextTick(() => {
         this.initCharts()
@@ -485,6 +530,9 @@ export default {
     }
     if (this.stockChart) {
       this.stockChart.destroy()
+    }
+    if (this.consumptionChart) {
+      this.consumptionChart.destroy()
     }
   },
   methods: {
@@ -519,7 +567,7 @@ export default {
         return
       }
 
-      // 库存商品TOP10图表
+      // 材料使用TOP10图表
       const usageCtx = this.$refs.usageChart ? this.$refs.usageChart.getContext('2d') : null
       if (usageCtx && !this.usageChart) {
         this.usageChart = new window.Chart(usageCtx, {
@@ -527,7 +575,7 @@ export default {
           data: {
             labels: [],
             datasets: [{
-              label: '库存数量',
+              label: '使用次数',
               data: [],
               backgroundColor: 'rgba(54, 162, 235, 0.7)',
               borderColor: 'rgb(54, 162, 235)',
@@ -545,7 +593,7 @@ export default {
               tooltip: {
                 callbacks: {
                   label: function(context) {
-                    return '库存数量: ' + context.raw
+                    return '使用次数: ' + context.raw
                   }
                 }
               }
@@ -555,13 +603,13 @@ export default {
                 beginAtZero: true,
                 title: {
                   display: true,
-                  text: '库存数量'
+                  text: '使用次数'
                 }
               },
               x: {
                 title: {
                   display: true,
-                  text: '商品名称'
+                  text: '材料名称'
                 }
               }
             }
@@ -569,13 +617,13 @@ export default {
         })
       }
 
-      // 库存状态分布图表
+      // 材料使用状态分布图表
       const stockCtx = this.$refs.stockChart ? this.$refs.stockChart.getContext('2d') : null
       if (stockCtx && !this.stockChart) {
         this.stockChart = new window.Chart(stockCtx, {
           type: 'doughnut',
           data: {
-            labels: ['库存充足', '库存预警', '缺货'],
+            labels: ['使用充足', '使用预警', '未使用'],
             datasets: [{
               data: [0, 0, 0],
               backgroundColor: [
@@ -613,6 +661,57 @@ export default {
           }
         })
       }
+
+      // 材料消耗趋势图表
+      const consumptionCtx = this.$refs.consumptionChart ? this.$refs.consumptionChart.getContext('2d') : null
+      if (consumptionCtx && !this.consumptionChart) {
+        this.consumptionChart = new window.Chart(consumptionCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: '耗材消耗量',
+              data: [],
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              borderColor: 'rgb(75, 192, 192)',
+              borderWidth: 2,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top'
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return '消耗量: ' + context.raw
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: '消耗量'
+                }
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: '时间周期'
+                }
+              }
+            }
+          }
+        })
+      }
     },
 
     // 更新图表数据
@@ -638,94 +737,126 @@ export default {
 
       if (this.stockChart) {
         const sufficient = this.consumableData.filter(function(item) {
-          return this.getStockStatus(item) === '库存充足'
+          return this.getStockStatus(item) === '使用充足'
         }.bind(this)).length
 
         const warning = this.consumableData.filter(function(item) {
-          return this.getStockStatus(item) === '库存预警'
+          return this.getStockStatus(item) === '使用预警'
         }.bind(this)).length
 
         const outOfStock = this.consumableData.filter(function(item) {
-          return this.getStockStatus(item) === '缺货'
+          return this.getStockStatus(item) === '未使用'
         }.bind(this)).length
 
         this.stockChart.data.datasets[0].data = [sufficient, warning, outOfStock]
         this.stockChart.update()
       }
-    },
 
-    // 加载耗材数据（简化的数据转换）
+      // 更新材料消耗趋势图表
+      if (this.consumptionChart && this.timeBasedConsumption.length > 0) {
+        this.consumptionChart.data.labels = this.timeBasedConsumption.map(item => item.period)
+        this.consumptionChart.data.datasets[0].data = this.timeBasedConsumption.map(item => item.count)
+        this.consumptionChart.update()
+      }
+    },
+    // 加载商品种类数（从工单统计获取）
+    async loadGoodsTypesCount() {
+      try {
+        // 调用工单统计API获取材料种类
+        const response = await consumableApi.getWorkOrderAnalysis({})
+
+        if (response) {
+          // 从工单数据中提取唯一的材料信息
+          const materials = new Set()
+          const workOrders = (response.data && response.data.data) || response.data || response.results || []
+
+          workOrders.forEach(order => {
+            if (order.actual_consumables && order.actual_consumables !== '') {
+              const consumables = this.parseActualConsumables(order.actual_consumables)
+              consumables.forEach(consumable => {
+                if (consumable.goods_desc) {
+                  materials.add(consumable.goods_desc)
+                }
+              })
+            }
+          })
+
+          this.goodsTypesCount = materials.size
+          console.log(`材料种类数：${this.goodsTypesCount}`)
+        }
+      } catch (error) {
+        console.error('加载材料种类数失败:', error)
+        this.goodsTypesCount = 0
+      }
+    },
+    // 加载耗材数据（从工单系统获取）
     async loadConsumableData() {
       this.loading = true
 
       try {
         // 构建请求参数
         const params = {
-          ordering: '-update_time',
+          classify: 4,
           page: this.pagination.page,
-          page_size: this.pagination.pageSize
+          per_page: this.pagination.pageSize
         }
 
-        // 添加搜索条件
+        // 添加筛选条件
         if (this.searchKeyword) {
           params.search = this.searchKeyword
         }
 
-        // 调用API
-        const response = await stockApi.getStockList(params)
+        // 添加日期范围筛选
+        if (this.dateRange && this.dateRange.length === 2) {
+          params.start_date = this.dateRange[0].toISOString().split('T')[0]
+          params.end_date = this.dateRange[1].toISOString().split('T')[0]
+        }
 
-        if (response && response.results) {
-          // 简化的数据转换
-          this.consumableData = response.results.map(item => {
-            // 计算总库存
-            let totalStock = 0
-            if (item.stock_info && item.stock_info.length > 0) {
-              totalStock = item.stock_info.reduce((sum, stock) => {
-                return sum + (stock.goods_qty || 0)
-              }, 0)
-            }
+        // 调用工单系统API
+        const response = await consumableApi.getWorkOrderList(params)
 
-            // 计算当前库存
-            let onhandStock = 0
-            if (item.stock_info && item.stock_info.length > 0) {
-              onhandStock = item.stock_info.reduce((sum, stock) => {
-                return sum + (stock.onhand_stock || 0)
-              }, 0)
-            }
+        if (response && response.data) {
+          const workOrders = response.data.data || []
 
-            return {
-              id: item.id,
-              goods_code: item.goods_code,
-              goods_desc: item.goods_desc,
-              goods_specs: item.goods_specs || '-',
-              goods_unit: item.goods_unit,
-              goods_class: item.goods_class,
-              goods_brand: item.goods_brand,
-              goods_color: item.goods_color,
-              goods_shape: item.goods_shape,
-              goods_origin: item.goods_origin,
-              goods_supplier: item.goods_supplier,
-              onhand_stock: onhandStock,
-              total_stock: totalStock,
-              can_order_stock: onhandStock, // 简化处理
-              inspect_stock: 0,
-              damage_stock: 0,
-              supplier: item.goods_supplier,
-              bar_code: item.bar_code,
-              creater: item.creater,
-              create_time: item.create_time,
-              update_time: item.update_time,
-              stock_info: item.stock_info || [],
-              safety_stock: item.safety_stock || 0,
-              min_stock: item.safety_stock || 10
+          // 从工单数据中提取材料信息
+          const consumableList = []
+
+          workOrders.forEach(order => {
+            // 解析actual_consumables字段
+            if (order.actual_consumables && order.actual_consumables !== '') {
+              const consumables = this.parseActualConsumables(order.actual_consumables)
+              consumables.forEach(consumable => {
+                consumableList.push({
+                  id: order.id,
+                  goods_code: order.id.toString(),
+                  goods_desc: consumable.goods_desc || '未知材料',
+                  goods_specs: consumable.goods_specses || order.work_order_type || '-',
+                  goods_unit: '件',
+                  onhand_stock: consumable.count || 1,
+                  total_stock: consumable.count || 1,
+                  can_order_stock: consumable.count || 1,
+                  inspect_stock: 0,
+                  damage_stock: 0,
+                  supplier: order.principals || '-',
+                  bar_code: consumable.id || order.id,
+                  create_time: order.create_time || '-',
+                  update_time: order.update_time || '-',
+                  min_stock: 10,
+                  work_order_id: order.id,
+                  work_order_type: order.work_order_type || '-',
+                  principal: order.principals || '-'
+                })
+              })
             }
           })
 
+          this.consumableData = consumableList
+
           // 更新分页信息
-          this.pagination.total = response.count || 0
-          this.pagination.count = response.count || 0
-          this.pagination.next = response.next
-          this.pagination.previous = response.previous
+          this.pagination.total = response.data.total_count || 0
+          this.pagination.count = response.data.total_count || 0
+          this.pagination.next = null
+          this.pagination.previous = null
 
           // 更新KPI
           this.calculateKPIs()
@@ -734,20 +865,139 @@ export default {
           this.updateCharts()
         }
       } catch (error) {
-        console.error('加载商品数据失败:', error)
+        console.error('加载工单数据失败:', error)
         this.$message.error('加载数据失败: ' + (error.message || '未知错误'))
-
-        // 加载模拟数据作为后备
-        this.loadMockData()
+        this.consumableData = []
       } finally {
         this.loading = false
       }
     },
 
+    // 解析actual_consumables字段
+    parseActualConsumables(consumablesStr) {
+      const consumables = []
+
+      try {
+        // 移除字符串两端的方括号
+        const cleanStr = consumablesStr.trim().replace(/^\[|\]$/g, '')
+
+        // 分割每个map
+        const mapRegex = /map\[(.*?)\]/g
+        let match
+
+        while ((match = mapRegex.exec(cleanStr)) !== null) {
+          const mapContent = match[1]
+          const consumable = {}
+
+          // 解析count
+          const countMatch = mapContent.match(/count:(\d+)/)
+          if (countMatch) {
+            consumable.count = parseInt(countMatch[1], 10)
+          }
+
+          // 解析goods_desc
+          const descMatch = mapContent.match(/goods_desc:([^\s\]]+)/)
+          if (descMatch) {
+            consumable.goods_desc = descMatch[1]
+          }
+
+          // 解析goods_specses
+          const specMatch = mapContent.match(/goods_specses:\[([^\]]+)\]/)
+          if (specMatch) {
+            consumable.goods_specses = specMatch[1]
+          }
+
+          // 解析id
+          const idMatch = mapContent.match(/id:(\d+)/)
+          if (idMatch) {
+            consumable.id = idMatch[1]
+          }
+
+          // 解析goods_sort
+          const sortMatch = mapContent.match(/goods_sort:([^\s\]]+)/)
+          if (sortMatch) {
+            consumable.goods_sort = sortMatch[1]
+          }
+
+          consumables.push(consumable)
+        }
+      } catch (error) {
+        console.error('解析actual_consumables失败:', error)
+      }
+
+      return consumables
+    },
+
+    // 从工单中提取材料数量
+    extractMaterialCount(order) {
+      if (!order.material_info || order.material_info === '') {
+        return 0
+      }
+      // 简化处理，假设每个工单使用1个材料
+      return 1
+    },
+
     // 计算KPI指标
     calculateKPIs() {
+      // 1. 总记录数
       this.totalInventory = this.consumableData.length
 
+      // 2. 统计材料种类数（从当前数据中统计）
+      const materialTypes = new Set()
+      this.consumableData.forEach(item => {
+        if (item.goods_desc) {
+          materialTypes.add(item.goods_desc)
+        }
+      })
+      this.goodsTypesCount = materialTypes.size
+
+      // 3. 统计使用最高频率的耗材
+      const consumableFrequency = {}
+      this.consumableData.forEach(item => {
+        if (item.goods_desc) {
+          if (!consumableFrequency[item.goods_desc]) {
+            consumableFrequency[item.goods_desc] = {
+              name: item.goods_desc,
+              count: 0,
+              totalQuantity: 0,
+              unit: item.goods_unit || '件'
+            }
+          }
+          consumableFrequency[item.goods_desc].count++
+          consumableFrequency[item.goods_desc].totalQuantity += item.onhand_stock || 1
+        }
+      })
+
+      // 找出使用频率最高的耗材
+      let maxFrequency = 0
+      let maxFrequencyConsumable = { name: '-', count: 0 }
+      let maxQuantity = 0
+      let maxQuantityConsumable = { name: '-', quantity: 0, unit: '' }
+
+      Object.values(consumableFrequency).forEach(item => {
+        // 最高频率
+        if (item.count > maxFrequency) {
+          maxFrequency = item.count
+          maxFrequencyConsumable = {
+            name: item.name,
+            count: item.count
+          }
+        }
+        // 最大数量
+        if (item.totalQuantity > maxQuantity) {
+          maxQuantity = item.totalQuantity
+          maxQuantityConsumable = {
+            name: item.name,
+            quantity: item.totalQuantity,
+            unit: item.unit
+          }
+        }
+      })
+
+      this.mostFrequentConsumable = maxFrequencyConsumable
+      this.mostQuantityConsumable = maxQuantityConsumable
+
+      // 4. 库存预警和缺货物品（基于材料使用情况）- 保留原有逻辑
       this.warningItems = this.consumableData.filter(item => {
         const minStock = item.min_stock || 10
         return item.onhand_stock > 0 && item.onhand_stock < minStock
@@ -757,9 +1007,13 @@ export default {
         return item.onhand_stock === 0
       }).length
 
+      // 5. 库存总量
       this.totalStock = this.consumableData.reduce((sum, item) => {
         return sum + (item.onhand_stock || 0)
       }, 0)
+
+      // 6. 计算时间周期消耗
+      this.calculateTimeBasedConsumption()
     },
 
     // 备用：模拟数据（API失败时使用）
@@ -796,19 +1050,19 @@ export default {
       this.updateCharts()
     },
 
-    // 从规格中提取单位
-    getUnitFromSpecs(specs) {
-      if (!specs) return '个'
-      if (specs.includes('mm2') || specs.includes('mm')) return '米'
-      if (specs.includes('*') && !specs.includes('mm')) return '米'
-      if (specs.includes('KV')) return '个'
-      if (specs.includes('个')) return '个'
-      if (specs.includes('台')) return '台'
-      if (specs.includes('套')) return '套'
-      if (specs.includes('包')) return '包'
-      if (specs.includes('卷')) return '卷'
-      return '个'
-    },
+    // 从规格中提取单位（已废弃，工单系统不需要）
+    // getUnitFromSpecs(specs) {
+    //   if (!specs) return '个'
+    //   if (specs.includes('mm2') || specs.includes('mm')) return '米'
+    //   if (specs.includes('*') && !specs.includes('mm')) return '米'
+    //   if (specs.includes('KV')) return '个'
+    //   if (specs.includes('个')) return '个'
+    //   if (specs.includes('台')) return '台'
+    //   if (specs.includes('套')) return '套'
+    //   if (specs.includes('包')) return '包'
+    //   if (specs.includes('卷')) return '卷'
+    //   return '个'
+    // },
 
     // 搜索和筛选
     handleSearch() {
@@ -819,6 +1073,45 @@ export default {
     handleFilter() {
       this.pagination.page = 1
       this.loadConsumableData()
+    },
+
+    // 耗材搜索结果计算
+    getConsumableSearchResults() {
+      if (!this.searchKeyword) return []
+
+      const keyword = this.searchKeyword.toLowerCase()
+      const results = {}
+
+      this.consumableData.forEach(item => {
+        if (item.goods_desc && item.goods_desc.toLowerCase().includes(keyword)) {
+          if (!results[item.goods_desc]) {
+            results[item.goods_desc] = {
+              name: item.goods_desc,
+              count: 0,
+              totalUsage: 0,
+              workOrders: []
+            }
+          }
+          results[item.goods_desc].count++
+          results[item.goods_desc].totalUsage += item.onhand_stock || 1
+          results[item.goods_desc].workOrders.push({
+            id: item.id,
+            goods_code: item.goods_code,
+            work_order_type: item.work_order_type || item.goods_specs,
+            principal: item.principal || item.supplier,
+            create_time: item.create_time
+          })
+        }
+      })
+
+      return Object.values(results)
+    },
+
+    // 显示使用该耗材的工单列表
+    showConsumableWorkOrders(consumable) {
+      this.currentConsumable = consumable
+      this.workOrders = consumable.workOrders
+      this.workOrderDialogVisible = true
     },
 
     // 分页处理
@@ -833,200 +1126,200 @@ export default {
       this.loadConsumableData()
     },
 
-    // 操作按钮
-    handleAdd() {
-      this.dialogTitle = '新增商品'
-      this.formData = {
-        id: null,
-        goods_code: '',
-        goods_desc: '',
-        goods_specs: '',
-        goods_qty: 0,
-        min_stock: 10,
-        supplier: '',
-        unit: '个',
-        bar_code: '',
-        remark: ''
-      }
-      this.dialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.consumableForm) {
-          this.$refs.consumableForm.clearValidate()
-        }
-      })
-    },
+    // 操作按钮（已废弃，工单系统不支持）
+    // handleAdd() {
+    //   this.dialogTitle = '新增商品'
+    //   this.formData = {
+    //     id: null,
+    //     goods_code: '',
+    //     goods_desc: '',
+    //     goods_specs: '',
+    //     goods_qty: 0,
+    //     min_stock: 10,
+    //     supplier: '',
+    //     unit: '个',
+    //     bar_code: '',
+    //     remark: ''
+    //   }
+    //   this.dialogVisible = true
+    //   this.$nextTick(() => {
+    //     if (this.$refs.consumableForm) {
+    //       this.$refs.consumableForm.clearValidate()
+    //     }
+    //   })
+    // },
 
-    handleEdit(row) {
-      this.dialogTitle = '编辑商品'
-      this.formData = {
-        id: row.id,
-        goods_code: row.goods_code,
-        goods_desc: row.goods_desc,
-        goods_specs: row.goods_specs || '',
-        goods_qty: row.onhand_stock,
-        min_stock: row.min_stock || 10,
-        supplier: row.supplier || '',
-        unit: this.getUnitFromSpecs(row.goods_specs),
-        bar_code: row.bar_code || '',
-        remark: ''
-      }
-      this.dialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.consumableForm) {
-          this.$refs.consumableForm.clearValidate()
-        }
-      })
-    },
+    // handleEdit(row) {
+    //   this.dialogTitle = '编辑商品'
+    //   this.formData = {
+    //     id: row.id,
+    //     goods_code: row.goods_code,
+    //     goods_desc: row.goods_desc,
+    //     goods_specs: row.goods_specs || '',
+    //     goods_qty: row.onhand_stock,
+    //     min_stock: row.min_stock || 10,
+    //     supplier: row.supplier || '',
+    //     unit: this.getUnitFromSpecs(row.goods_specs),
+    //     bar_code: row.bar_code || '',
+    //     remark: ''
+    //   }
+    //   this.dialogVisible = true
+    //   this.$nextTick(() => {
+    //     if (this.$refs.consumableForm) {
+    //       this.$refs.consumableForm.clearValidate()
+    //     }
+    //   })
+    // },
 
-    handleStockIn(row) {
-      this.stockOperation = 'in'
-      this.stockDialogTitle = '入库操作 - ' + row.goods_desc
-      this.currentConsumable = row
-      this.stockFormData = {
-        quantity: 1,
-        remark: ''
-      }
-      this.stockDialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.stockForm) {
-          this.$refs.stockForm.clearValidate()
-        }
-      })
-    },
+    // handleStockIn(row) {
+    //   this.stockOperation = 'in'
+    //   this.stockDialogTitle = '入库操作 - ' + row.goods_desc
+    //   this.currentConsumable = row
+    //   this.stockFormData = {
+    //     quantity: 1,
+    //     remark: ''
+    //   }
+    //   this.stockDialogVisible = true
+    //   this.$nextTick(() => {
+    //     if (this.$refs.stockForm) {
+    //       this.$refs.stockForm.clearValidate()
+    //     }
+    //   })
+    // },
 
-    handleStockOut(row) {
-      this.stockOperation = 'out'
-      this.stockDialogTitle = '出库操作 - ' + row.goods_desc
-      this.currentConsumable = row
-      this.stockFormData = {
-        quantity: 1,
-        remark: ''
-      }
-      this.stockDialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.stockForm) {
-          this.$refs.stockForm.clearValidate()
-        }
-      })
-    },
+    // handleStockOut(row) {
+    //   this.stockOperation = 'out'
+    //   this.stockDialogTitle = '出库操作 - ' + row.goods_desc
+    //   this.currentConsumable = row
+    //   this.stockFormData = {
+    //     quantity: 1,
+    //     remark: ''
+    //   }
+    //   this.stockDialogVisible = true
+    //   this.$nextTick(() => {
+    //     if (this.$refs.stockForm) {
+    //       this.$refs.stockForm.clearValidate()
+    //     }
+    //   })
+    // },
 
-    // 表单提交
-    async handleSubmit() {
-      try {
-        await this.$refs.consumableForm.validate()
-        this.formLoading = true
+    // 表单提交（已废弃）
+    // async handleSubmit() {
+    //   try {
+    //     await this.$refs.consumableForm.validate()
+    //     this.formLoading = true
 
-        const formData = { ...this.formData }
-        const id = formData.id
+    //     const formData = { ...this.formData }
+    //     const id = formData.id
 
-        if (id) {
-          // 更新操作
-          const updateData = {
-            goods_code: formData.goods_code,
-            goods_desc: formData.goods_desc,
-            goods_specs: formData.goods_specs,
-            goods_supplier: formData.supplier,
-            goods_unit: formData.unit,
-            goods_cost: 1.0,
-            goods_price: 1.0,
-            bar_code: formData.bar_code
-          }
+    //     if (id) {
+    //       // 更新操作
+    //       const updateData = {
+    //         goods_code: formData.goods_code,
+    //         goods_desc: formData.goods_desc,
+    //         goods_specs: formData.goods_specs,
+    //         goods_supplier: formData.supplier,
+    //         goods_unit: formData.unit,
+    //         goods_cost: 1.0,
+    //         goods_price: 1.0,
+    //         bar_code: formData.bar_code
+    //       }
 
-          await stockApi.updateGoods(id, updateData)
-          this.$message.success('更新成功')
-        } else {
-          // 新增操作
-          const createData = {
-            goods_code: formData.goods_code,
-            goods_desc: formData.goods_desc,
-            goods_specs: formData.goods_specs,
-            goods_supplier: formData.supplier || 'Supplier Name-1',
-            goods_unit: formData.unit || 'Piece',
-            goods_weight: 1.0,
-            goods_w: 1.0,
-            goods_d: 1.0,
-            goods_h: 1.0,
-            goods_cost: 1.0,
-            goods_price: 1.0,
-            bar_code: formData.bar_code || '',
-            creater: 'admin'
-          }
+    //       await stockApi.updateGoods(id, updateData)
+    //       this.$message.success('更新成功')
+    //     } else {
+    //       // 新增操作
+    //       const createData = {
+    //         goods_code: formData.goods_code,
+    //         goods_desc: formData.goods_desc,
+    //         goods_specs: formData.goods_specs,
+    //         goods_supplier: formData.supplier || 'Supplier Name-1',
+    //         goods_unit: formData.unit || 'Piece',
+    //         goods_weight: 1.0,
+    //         goods_w: 1.0,
+    //         goods_d: 1.0,
+    //         goods_h: 1.0,
+    //         goods_cost: 1.0,
+    //         goods_price: 1.0,
+    //         bar_code: formData.bar_code || '',
+    //         creater: 'admin'
+    //       }
 
-          await stockApi.createGoods(createData)
-          this.$message.success('新增成功')
-        }
+    //       await stockApi.createGoods(createData)
+    //       this.$message.success('新增成功')
+    //     }
 
-        this.dialogVisible = false
-        this.refreshData()
-      } catch (error) {
-        console.error('保存失败:', error)
-        this.$message.error('保存失败: ' + (error.message || '未知错误'))
-      } finally {
-        this.formLoading = false
-      }
-    },
+    //     this.dialogVisible = false
+    //     this.refreshData()
+    //   } catch (error) {
+    //     console.error('保存失败:', error)
+    //     this.$message.error('保存失败: ' + (error.message || '未知错误'))
+    //   } finally {
+    //     this.formLoading = false
+    //   }
+    // },
 
-    // 库存操作提交
-    async handleStockSubmit() {
-      try {
-        await this.$refs.stockForm.validate()
-        this.stockFormLoading = true
+    // 库存操作提交（已废弃）
+    // async handleStockSubmit() {
+    //   try {
+    //     await this.$refs.stockForm.validate()
+    //     this.stockFormLoading = true
 
-        // 检查库存是否充足
-        if (this.stockOperation === 'out') {
-          if (this.currentConsumable.onhand_stock < this.stockFormData.quantity) {
-            this.$message.error('库存不足，无法出库')
-            this.stockFormLoading = false
-            return
-          }
-        }
+    //     // 检查库存是否充足
+    //     if (this.stockOperation === 'out') {
+    //       if (this.currentConsumable.onhand_stock < this.stockFormData.quantity) {
+    //         this.$message.error('库存不足，无法出库')
+    //         this.stockFormLoading = false
+    //         return
+    //       }
+    //     }
 
-        const operationData = {
-          goods_id: this.currentConsumable.id,
-          quantity: this.stockFormData.quantity,
-          remark: this.stockFormData.remark || '',
-          operation_type: this.stockOperation
-        }
+    //     const operationData = {
+    //       goods_id: this.currentConsumable.id,
+    //       quantity: this.stockFormData.quantity,
+    //       remark: this.stockFormData.remark || '',
+    //       operation_type: this.stockOperation
+    //     }
 
-        const promise = this.stockOperation === 'in'
-          ? stockApi.stockIn(operationData)
-          : stockApi.stockOut(operationData)
+    //     const promise = this.stockOperation === 'in'
+    //       ? stockApi.stockIn(operationData)
+    //       : stockApi.stockOut(operationData)
 
-        await promise
-        this.$message.success(this.stockOperation === 'in' ? '入库成功' : '出库成功')
-        this.stockDialogVisible = false
-        this.refreshData()
-      } catch (error) {
-        console.error('库存操作失败:', error)
-        this.$message.error('操作失败: ' + (error.message || '未知错误'))
-      } finally {
-        this.stockFormLoading = false
-      }
-    },
+    //     await promise
+    //     this.$message.success(this.stockOperation === 'in' ? '入库成功' : '出库成功')
+    //     this.stockDialogVisible = false
+    //     this.refreshData()
+    //   } catch (error) {
+    //     console.error('库存操作失败:', error)
+    //     this.$message.error('操作失败: ' + (error.message || '未知错误'))
+    //   } finally {
+    //     this.stockFormLoading = false
+    //   }
+    // },
 
-    // 对话框关闭
-    handleDialogClose() {
-      this.dialogVisible = false
-      this.$nextTick(() => {
-        if (this.$refs.consumableForm) {
-          this.$refs.consumableForm.clearValidate()
-        }
-      })
-    },
+    // 对话框关闭（已废弃）
+    // handleDialogClose() {
+    //   this.dialogVisible = false
+    //   this.$nextTick(() => {
+    //     if (this.$refs.consumableForm) {
+    //       this.$refs.consumableForm.clearValidate()
+    //     }
+    //   })
+    // },
 
-    handleStockDialogClose() {
-      this.stockDialogVisible = false
-      this.$nextTick(() => {
-        if (this.$refs.stockForm) {
-          this.$refs.stockForm.clearValidate()
-        }
-      })
-    },
+    // handleStockDialogClose() {
+    //   this.stockDialogVisible = false
+    //   this.$nextTick(() => {
+    //     if (this.$refs.stockForm) {
+    //       this.$refs.stockForm.clearValidate()
+    //     }
+    //   })
+    // },
 
     // 导出数据
     handleExport() {
       try {
-        const headers = ['商品代码', '商品名称', '型号规格', '当前库存', '供应商', '最后更新']
+        const headers = ['工单ID', '材料名称', '工单类型', '使用次数', '工单负责人', '最后使用']
         const rows = this.consumableData.map(item => {
           return [
             item.goods_code,
@@ -1051,7 +1344,7 @@ export default {
         const link = document.createElement('a')
         const url = URL.createObjectURL(blob)
         link.setAttribute('href', url)
-        link.setAttribute('download', '库存数据_' + new Date().toLocaleDateString() + '.csv')
+        link.setAttribute('download', '工单材料数据_' + new Date().toLocaleDateString() + '.csv')
         link.style.visibility = 'hidden'
         document.body.appendChild(link)
         link.click()
@@ -1069,6 +1362,60 @@ export default {
       this.loadConsumableData()
     },
 
+    // 时间周期统计相关方法
+    handleTimePeriodChange() {
+      this.calculateTimeBasedConsumption()
+      this.updateCharts()
+    },
+
+    // 处理日期范围变化
+    handleDateRangeChange() {
+      this.pagination.page = 1
+      this.loadConsumableData()
+    },
+
+    // 计算时间周期消耗
+    calculateTimeBasedConsumption() {
+      const consumption = {}
+
+      this.consumableData.forEach(item => {
+        if (!item.create_time) return
+
+        const date = new Date(item.create_time)
+        let key
+
+        switch (this.timePeriod) {
+          case 'day': { // 加 {
+            key = date.toISOString().split('T')[0]
+            break
+          } // 加 }
+          case 'week': { // 这里加 {  👇 修复点
+            const weekStart = new Date(date)
+            weekStart.setDate(date.getDate() - date.getDay())
+            key = weekStart.toISOString().split('T')[0]
+            break
+          } // 这里加 }
+          case 'month': { // 加 {
+            key = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0')
+            break
+          } // 加 }
+          case 'year': { // 加 {
+            key = date.getFullYear().toString()
+            break
+          } // 加 }
+        }
+        if (!consumption[key]) {
+          consumption[key] = 0
+        }
+        consumption[key] += item.onhand_stock || 1
+      })
+
+      // 转换为数组格式
+      this.timeBasedConsumption = Object.entries(consumption)
+        .map(([period, count]) => ({ period, count }))
+        .sort((a, b) => a.period.localeCompare(b.period))
+    },
+
     // 工具方法
     getStockClass(item) {
       const minStock = item.min_stock || this.minStockThreshold
@@ -1084,20 +1431,20 @@ export default {
     getStockStatus(item) {
       const minStock = item.min_stock || this.minStockThreshold
       if (item.onhand_stock === 0) {
-        return '缺货'
+        return '未使用'
       } else if (item.onhand_stock < minStock) {
-        return '库存预警'
+        return '使用预警'
       } else {
-        return '库存充足'
+        return '使用充足'
       }
     },
 
     getStockStatusType(item) {
       const status = this.getStockStatus(item)
       const typeMap = {
-        '缺货': 'danger',
-        '库存预警': 'warning',
-        '库存充足': 'success'
+        '未使用': 'danger',
+        '使用预警': 'warning',
+        '使用充足': 'success'
       }
       return typeMap[status] || 'info'
     }
@@ -1221,6 +1568,24 @@ export default {
   font-size: 28px;
   font-weight: bold;
   margin-bottom: 5px;
+}
+
+.kpi-value .kpi-unit {
+  font-size: 14px;
+  font-weight: normal;
+  color: #666;
+  margin-left: 5px;
+}
+
+.kpi-value.kpi-text-small {
+  font-size: 16px;
+  line-height: 1.4;
+  max-height: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .kpi-label {

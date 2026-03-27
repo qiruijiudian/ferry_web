@@ -71,10 +71,10 @@
       </div>
     </div>
 
-    <!-- 第一行：全部维修人员工单完成情况（占整行） -->
+    <!-- 第一行：工单负责人处理工单情况（占整行） -->
     <div class="full-width-section">
       <div class="section-header">
-        <h3 class="section-title">全部维修人员工单完成情况</h3>
+        <h3 class="section-title">工单负责人处理工单情况</h3>
         <div class="section-actions">
           <el-button
             v-if="workerData.length > 10 && !showAllWorkers"
@@ -102,7 +102,11 @@
           :height="tableHeight"
         >
           <el-table-column prop="rank" label="排名" width="60" />
-          <el-table-column prop="name" label="维修人员" width="120" />
+          <el-table-column prop="name" label="工单负责人" width="120">
+            <template slot-scope="scope">
+              <span class="clickable" @click="showPrincipalOrders(scope.row.name)">{{ scope.row.name }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="completed" label="完成工单数" width="130" />
           <el-table-column prop="total_orders" label="总工单数" width="130" />
           <el-table-column prop="avgTime" label="平均完成时长(小时)" width="160" />
@@ -494,6 +498,14 @@
 
         <el-table-column prop="area" label="片区" width="100" />
         <el-table-column prop="work_order_type" label="工单类型" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="fault_reason" label="故障原因" min-width="200" show-overflow-tooltip>
+          <template slot-scope="scope">
+            <span v-if="scope.row.fault_reason && scope.row.fault_reason.trim() !== ''">
+              {{ scope.row.fault_reason }}
+            </span>
+            <span v-else style="color: #f56c6c; font-weight: bold;">未填写原因</span>
+          </template>
+        </el-table-column>
 
         <!-- 将创建时间和完成时间移到最右边 -->
         <el-table-column prop="create_time" label="创建时间" width="180" sortable="custom" />
@@ -609,6 +621,48 @@
       </span>
     </el-dialog>
 
+    <!-- 负责人工单详情弹窗 -->
+    <el-dialog
+      :title="principalOrdersTitle"
+      :visible.sync="principalOrdersDialogVisible"
+      width="90%"
+      top="5vh"
+      class="principal-orders-dialog"
+    >
+      <div class="dialog-toolbar">
+        <span class="total-count">共 {{ principalOrdersData.length }} 条工单</span>
+      </div>
+
+      <el-table
+        v-loading="principalOrdersLoading"
+        :data="principalOrdersData"
+        style="width: 100%"
+        max-height="600"
+        stripe
+        border
+      >
+        <el-table-column prop="id" label="工单ID" width="100" />
+        <el-table-column prop="maintainer" label="维修师傅" min-width="150" />
+        <el-table-column prop="title" label="工单标题" min-width="200" />
+        <el-table-column prop="status" label="状态" width="100">
+          <template slot-scope="scope">
+            <el-tag :type="getStatusTagType(scope.row.status)" size="small">
+              {{ scope.row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="work_order_type" label="工单类型" width="120" />
+        <el-table-column prop="area" label="片区" width="100" />
+        <el-table-column prop="completion_time" label="完成时长" width="120" />
+        <el-table-column prop="create_time" label="创建时间" width="180" />
+        <el-table-column prop="finish_time" label="完成时间" width="180" />
+      </el-table>
+
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="principalOrdersDialogVisible = false">关闭</el-button>
+      </span>
+    </el-dialog>
+
     <div class="footer">
       本报告由维修工单系统自动生成 | 生成时间: {{ currentTime }}
     </div>
@@ -671,7 +725,7 @@ export default {
         { label: '返修工单数量', value: '0', trend: '', icon: '', description: '' },
         { label: '平均完成时长', value: '0小时', trend: '', icon: '', description: '' },
         { label: '一次性修复率', value: '0%', trend: '', icon: '', description: '' },
-        { label: '维修人员排行', value: '', worker: '', count: 0, trend: '', icon: '', description: '' }
+        { label: '负责人排行', value: '', worker: '', count: 0, trend: '', icon: '', description: '' }
       ],
       workerData: [],
       workerLoading: false,
@@ -814,7 +868,13 @@ export default {
       faultReasonLoading: false,
       faultReasonCurrentPage: 1,
       faultReasonPageSize: 10,
-      tableBodyHeight: 250 // 初始高度，会在mounted中计算
+      tableBodyHeight: 250, // 初始高度，会在mounted中计算
+      // 新增：负责人工单详情弹窗
+      principalOrdersDialogVisible: false,
+      principalOrdersTitle: '',
+      principalOrdersLoading: false,
+      principalOrdersData: [],
+      currentPrincipal: ''
     }
   },
   computed: {
@@ -1158,8 +1218,9 @@ export default {
         params.startTime = this.formatDate(startTime)
         params.endTime = this.formatDate(now)
       } else {
-        const startTime = new Date(2006, 0, 1)
+        // 调整"全部时长"的时间范围为最近10年，避免数据量过大导致超时
         const endTime = new Date()
+        const startTime = new Date(endTime.getFullYear() - 10, endTime.getMonth(), endTime.getDate())
         params.startTime = this.formatDate(startTime)
         params.endTime = this.formatDate(endTime)
       }
@@ -1399,12 +1460,10 @@ export default {
     updateWorkTypeChart() {
       console.log('更新工单类型分布图表')
 
-      // 检查是否有数据
       if (!this.reportData.work_order_type_stats ||
         this.reportData.work_order_type_stats.length === 0) {
         console.warn('工单类型统计数据为空，饼图可能无法显示')
 
-        // 如果没有数据，初始化一个空图表
         if (this.chartJsInstances.workTypeChart) {
           this.chartJsInstances.workTypeChart.data.labels = ['暂无数据']
           this.chartJsInstances.workTypeChart.data.datasets[0].data = [1]
@@ -1420,19 +1479,62 @@ export default {
       if (this.chartJsInstances.workTypeChart && this.reportData.work_order_type_stats) {
         const labels = this.reportData.work_order_type_stats.map(item => item.type)
         const data = this.reportData.work_order_type_stats.map(item => item.count)
+        const total = data.reduce((sum, val) => sum + val, 0)
 
         console.log('工单类型分布 - 标签:', labels)
         console.log('工单类型分布 - 数据:', data)
 
-        // 动态生成颜色（避免hardcode）
-        const colors = this.generateChartColors(labels.length)
+        const colors = this.getWorkTypeChartColors(labels)
 
-        this.chartJsInstances.workTypeChart.data.labels = labels
+        const labelsWithInfo = labels.map((label, index) => {
+          const count = data[index]
+          const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0
+          return `${label}：${count}  ${percentage}%`
+        })
+
+        this.chartJsInstances.workTypeChart.data.labels = labelsWithInfo
         this.chartJsInstances.workTypeChart.data.datasets[0].data = data
         this.chartJsInstances.workTypeChart.data.datasets[0].backgroundColor = colors.backgroundColor
         this.chartJsInstances.workTypeChart.data.datasets[0].borderColor = colors.borderColor
         this.chartJsInstances.workTypeChart.update()
       }
+    },
+
+    getWorkTypeChartColors(labels) {
+      const colors = {
+        backgroundColor: [],
+        borderColor: []
+      }
+
+      const typeColorMap = {
+        '供暖': { bg: 'rgba(239, 68, 68, 0.7)', border: 'rgb(220, 38, 38)' },
+        '供水': { bg: 'rgba(59, 130, 246, 0.7)', border: 'rgb(37, 99, 235)' },
+        '供氧': { bg: 'rgba(34, 197, 94, 0.7)', border: 'rgb(22, 163, 74)' }
+      }
+
+      const defaultColors = [
+        { bg: 'rgba(251, 191, 36, 0.7)', border: 'rgb(245, 158, 11)' },
+        { bg: 'rgba(168, 85, 247, 0.7)', border: 'rgb(147, 51, 234)' },
+        { bg: 'rgba(236, 72, 153, 0.7)', border: 'rgb(219, 39, 119)' },
+        { bg: 'rgba(20, 184, 166, 0.7)', border: 'rgb(13, 148, 136)' },
+        { bg: 'rgba(249, 115, 22, 0.7)', border: 'rgb(234, 88, 12)' }
+      ]
+
+      let defaultIndex = 0
+
+      labels.forEach(label => {
+        if (typeColorMap[label]) {
+          colors.backgroundColor.push(typeColorMap[label].bg)
+          colors.borderColor.push(typeColorMap[label].border)
+        } else {
+          const defaultColor = defaultColors[defaultIndex % defaultColors.length]
+          colors.backgroundColor.push(defaultColor.bg)
+          colors.borderColor.push(defaultColor.border)
+          defaultIndex++
+        }
+      })
+
+      return colors
     },
     // 新增：动态生成图表颜色
     generateChartColors(count) {
@@ -1723,9 +1825,20 @@ export default {
         const script = document.createElement('script')
         script.src = 'https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js'
         script.onload = () => {
-          // 初始化所有图表
-          this.initCharts()
-          resolve()
+          const datalabelsScript = document.createElement('script')
+          datalabelsScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@1.0.0/dist/chartjs-plugin-datalabels.min.js'
+          datalabelsScript.onload = () => {
+            if (window.ChartDataLabels) {
+              window.Chart.plugins.register(window.ChartDataLabels)
+            }
+            this.initCharts()
+            resolve()
+          }
+          datalabelsScript.onerror = () => {
+            this.initCharts()
+            resolve()
+          }
+          document.head.appendChild(datalabelsScript)
         }
         script.onerror = reject
         document.head.appendChild(script)
@@ -1838,11 +1951,11 @@ export default {
       this.chartJsInstances.workTypeChart = new window.Chart(workTypeCtx, {
         type: 'pie',
         data: {
-          labels: [], // 初始为空
+          labels: [],
           datasets: [{
-            data: [], // 初始为空
-            backgroundColor: [], // 动态生成
-            borderColor: [], // 动态生成
+            data: [],
+            backgroundColor: [],
+            borderColor: [],
             borderWidth: 1
           }]
         },
@@ -1851,7 +1964,50 @@ export default {
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: 'right'
+              position: 'right',
+              labels: {
+                font: {
+                  size: 12
+                },
+                generateLabels: function(chart) {
+                  const data = chart.data
+                  if (data.labels.length && data.datasets.length) {
+                    return data.labels.map(function(label, i) {
+                      const meta = chart.getDatasetMeta(0)
+                      const style = meta.controller.getStyle(i)
+                      return {
+                        text: label,
+                        fillStyle: style.backgroundColor,
+                        strokeStyle: style.borderColor,
+                        lineWidth: style.borderWidth,
+                        hidden: isNaN(data.datasets[0].data[i]),
+                        index: i
+                      }
+                    })
+                  }
+                  return []
+                }
+              }
+            },
+            datalabels: {
+              color: '#fff',
+              font: {
+                weight: 'bold',
+                size: 11
+              },
+              formatter: function(value, context) {
+                const total = context.dataset.data.reduce(function(a, b) { return a + b }, 0)
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0
+                const label = context.chart.data.labels[context.dataIndex] || ''
+                const typeMatch = label.match(/^(供暖|供水|供氧|维保|其他)/)
+                const typeName = typeMatch ? typeMatch[1] : label.split('：')[0]
+                return `${typeName}：${value}\n${percentage}%`
+              },
+              textAlign: 'center',
+              display: function(context) {
+                const value = context.dataset.data[context.dataIndex]
+                return value > 0
+              }
             }
           }
         }
@@ -2805,7 +2961,7 @@ export default {
       return {
         id: item.id || '',
         title: item.title || '',
-        worker: item.principals || '未分配',
+        worker: item.actual_maintainer || '未分配',
         status: this.formatStatus(item),
         completion_time: this.calculateCompletionTime(item) || '未完成',
         // 新增列：分配耗时和操作耗时
@@ -2814,7 +2970,8 @@ export default {
         create_time: item.create_time || '',
         finish_time: item.is_end ? item.update_time : '未完成',
         area: this.formatArea(item.belongs || item.area),
-        work_order_type: item.work_order_type || '-'
+        work_order_type: item.work_order_type || '-',
+        fault_reason: item.fault_reason || ''
       }
     },
 
@@ -3207,8 +3364,9 @@ export default {
         params.startTime = this.formatDate(startTime)
         params.endTime = this.formatDate(endTime)
       } else {
-        const startTime = new Date(2006, 0, 1)
+        // 调整"全部时长"的时间范围为最近10年，避免数据量过大导致超时
         const endTime = new Date()
+        const startTime = new Date(endTime.getFullYear() - 10, endTime.getMonth(), endTime.getDate())
         params.startTime = this.formatDate(startTime)
         params.endTime = this.formatDate(endTime)
       }
@@ -3244,7 +3402,7 @@ export default {
           this.fetchTimeoutWorkOrderDetails()
           break
         case 3:
-          this.$message.info('返修工单详情功能待实现')
+          this.fetchReworkWorkOrderDetails()
           break
         case 4:
           this.fetchWorkOrderTotalDetails()
@@ -3258,6 +3416,76 @@ export default {
         default:
           return
       }
+    },
+    fetchReworkWorkOrderDetails() {
+      this.workOrderLoading = true
+      this.workOrderDialogTitle = '返修工单详情'
+      this.workOrderDialogVisible = true
+
+      this.workOrderCurrentPage = 1
+      this.workOrderSearch = ''
+
+      const filterParams = this.getFilterParams()
+
+      const apiParams = {
+        classify: 4,
+        page: 1,
+        per_page: 100,
+        ...filterParams
+      }
+
+      console.log('返修工单请求参数:', apiParams)
+
+      axios({
+        url: 'https://order.cdqrmi.com/api/v1/analysis/list',
+        method: 'get',
+        params: apiParams,
+        timeout: 30000,
+        headers: {
+          'Authorization': 'Bearer ' + this.getToken()
+        }
+      }).then(response => {
+        this.workOrderLoading = false
+        console.log('返修工单API响应:', response.data)
+
+        if (response.data.code === 200) {
+          if (response.data.data && response.data.data.data) {
+            // 筛选返修工单（标题中含有ReId的工单，不区分大小写）
+            const allOrders = response.data.data.data
+            const reworkOrders = allOrders.filter(item => {
+              return item.title && item.title.toLowerCase().includes('reid')
+            })
+
+            this.workOrderDetailData = reworkOrders.map(item => this.formatWorkOrderData(item))
+            console.log(`成功加载 ${this.workOrderDetailData.length} 条返修工单记录`)
+
+            this.hasMoreData = false
+
+            if (this.workOrderDetailData.length === 0) {
+              this.$message.info('当前筛选条件下没有返修工单')
+            }
+          } else {
+            this.workOrderDetailData = []
+          }
+        } else {
+          this.$message.error(`获取返修工单详情失败：${response.data.msg || '未知错误'}`)
+          this.workOrderDetailData = []
+        }
+      }).catch(error => {
+        this.workOrderLoading = false
+        console.error('请求返修工单失败:', error)
+
+        if (error.code === 'ECONNABORTED') {
+          this.$message.error('请求超时，请尝试缩小筛选范围或联系管理员')
+        } else if (error.response) {
+          this.$message.error(`服务器错误: ${error.response.status} - ${(error.response.data && error.response.data.msg) || '未知错误'}`)
+        } else if (error.request) {
+          this.$message.error('网络连接失败，请检查网络连接')
+        } else {
+          this.$message.error('请求配置错误: ' + error.message)
+        }
+        this.workOrderDetailData = []
+      })
     },
     fetchTimeoutWorkOrderDetails() {
       this.workOrderLoading = true
@@ -3381,7 +3609,7 @@ export default {
     exportWorkOrderData() {
       this.exportLoading = true
       try {
-        const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '分配耗时', '操作耗时', '片区', '工单类型', '创建时间', '完成时间']
+        const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '分配耗时', '操作耗时', '片区', '工单类型', '故障原因', '创建时间', '完成时间']
         const csvData = this.filteredWorkOrderData.map(item => [
           item.id,
           item.title,
@@ -3392,6 +3620,7 @@ export default {
           item.operation_time,
           item.area,
           item.work_order_type,
+          item.fault_reason || '未填写原因',
           item.create_time,
           item.finish_time
         ])
@@ -3786,6 +4015,74 @@ export default {
     // 新增：处理窗口大小变化
     handleResize() {
       this.calculateTableHeight()
+    },
+
+    // 显示负责人工单详情
+    showPrincipalOrders(principalName) {
+      this.currentPrincipal = principalName
+      this.principalOrdersTitle = `${principalName} 负责的工单详情`
+      this.principalOrdersLoading = true
+      this.principalOrdersDialogVisible = true
+
+      // 获取筛选参数
+      const filterParams = this.getFilterParams()
+
+      // 构建请求参数
+      const apiParams = {
+        classify: 4,
+        page: 1,
+        per_page: 500,
+        ...filterParams
+      }
+
+      axios({
+        url: 'https://order.cdqrmi.com/api/v1/analysis/list',
+        method: 'get',
+        params: apiParams,
+        timeout: 30000,
+        headers: {
+          'Authorization': 'Bearer ' + this.getToken()
+        }
+      }).then(response => {
+        this.principalOrdersLoading = false
+        if (response.data.code === 200 && response.data.data && response.data.data.data) {
+          const allOrders = response.data.data.data
+
+          // 筛选出该负责人负责的工单
+          const principalOrders = allOrders.filter(order => {
+            // 检查工单负责人是否匹配
+            if (order.principals === principalName) {
+              return true
+            }
+            return false
+          })
+
+          // 格式化工单数据
+          this.principalOrdersData = principalOrders.map(order => {
+            return {
+              id: order.id || '',
+              maintainer: order.actual_maintainer || '未分配',
+              title: order.title || '-',
+              status: this.formatStatus(order),
+              work_order_type: order.work_order_type || '-',
+              area: this.formatArea(order.belongs || order.area),
+              completion_time: this.calculateCompletionTime(order),
+              create_time: order.create_time || '',
+              finish_time: order.update_time || ''
+            }
+          })
+
+          console.log(`成功加载 ${this.principalOrdersData.length} 条${principalName}负责的工单`)
+        } else {
+          this.principalOrdersData = []
+          this.$message.warning(`未找到${principalName}负责的工单`)
+        }
+      }).catch(error => {
+        this.principalOrdersLoading = false
+        console.error('获取负责人工单失败:', error)
+        this.$message.error('获取负责人工单失败')
+        this.principalOrdersData = []
+      })
     }
   }
 
@@ -4410,5 +4707,39 @@ body {
     align-items: flex-start;
     gap: 5px;
   }
+}
+
+/* 可点击样式 */
+.clickable {
+  color: #409EFF;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.clickable:hover {
+  color: #66B1FF;
+}
+
+/* 弹窗工具栏 */
+.dialog-toolbar {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.total-count {
+  font-size: 14px;
+  color: #606266;
+}
+
+/* 负责人工单弹窗样式 */
+.principal-orders-dialog .el-table {
+  font-size: 14px;
+}
+
+.principal-orders-dialog .el-table th {
+  background-color: #f5f7fa;
+  font-weight: 600;
 }
 </style>

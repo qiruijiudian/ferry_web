@@ -155,3 +155,12 @@ QQ群 4：493389089
 [LGPL-3.0](https://github.com/lanyulei/ferry/blob/master/LICENSE)
 
 Copyright (c) 2021 lanyulei
+
+
+本地出现$ yarn run dev
+Yarn requires Node.js 4.0 or higher to be installed. 
+nvm -v 查看nvm版本
+nvm list 列出所有版本
+nvm use 14.21.3 切换到14.21.3版本
+node -v 查看node版本
+yarn run dev 启动项目

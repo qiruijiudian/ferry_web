@@ -71,6 +71,57 @@
       </div>
     </div>
 
+    <!-- 维修师傅完成工单情况 -->
+    <div class="full-width-section">
+      <div class="section-header">
+        <h3 class="section-title">维修师傅完成工单情况</h3>
+        <div class="section-actions">
+          <el-button
+            v-if="maintainerStats.length > 10 && !showAllMaintainers"
+            type="text"
+            icon="el-icon-arrow-down"
+            @click="showAllMaintainers = true"
+          >
+            展开全部 {{ maintainerStats.length }} 条数据
+          </el-button>
+          <el-button
+            v-if="maintainerStats.length > 10 && showAllMaintainers"
+            type="text"
+            icon="el-icon-arrow-up"
+            @click="showAllMaintainers = false"
+          >
+            收起至前10条
+          </el-button>
+        </div>
+      </div>
+      <div class="table-container">
+        <el-table
+          v-loading="maintainerLoading"
+          :data="showAllMaintainers ? maintainerStats : maintainerStats.slice(0, 10)"
+          style="width: 100%"
+          :height="tableHeight"
+        >
+          <el-table-column prop="rank" label="排名" width="80" />
+          <el-table-column prop="name" label="维修师傅" width="150" />
+          <el-table-column prop="independentCount" label="独立完成工单数" width="150">
+            <template slot-scope="scope">
+              <span class="clickable" @click="showMaintainerOrders(scope.row.name, 'independent')">
+                {{ scope.row.independentCount }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="cooperativeCount" label="合作完成工单数" width="150">
+            <template slot-scope="scope">
+              <span class="clickable" @click="showMaintainerOrders(scope.row.name, 'cooperative')">
+                {{ scope.row.cooperativeCount }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="totalCount" label="总完成工单数" width="150" />
+        </el-table>
+      </div>
+    </div>
+
     <!-- 第一行：工单负责人处理工单情况（占整行） -->
     <div class="full-width-section">
       <div class="section-header">
@@ -132,7 +183,25 @@
         </div>
       </div>
       <div class="chart-box">
-        <div class="chart-title">工单类型分布</div>
+        <div class="chart-title">
+          <span>工单类型分布<span class="chart-period">{{ getReportPeriodText }}</span></span>
+          <div class="chart-filter">
+            <span class="filter-label">选择：</span>
+            <el-select
+              v-model="pieChartSelectedAreas"
+              multiple
+              placeholder="全部片区"
+              size="mini"
+              style="width: 280px;"
+              @change="handlePieChartAreaChange"
+            >
+              <el-option label="岗巴" value="kamba" />
+              <el-option label="萨迦" value="sayga" />
+              <el-option label="拉萨" value="lhasa" />
+              <el-option label="错那" value="cona" />
+            </el-select>
+          </div>
+        </div>
         <div class="chart-wrapper">
           <canvas ref="workTypeChart" />
         </div>
@@ -142,7 +211,12 @@
     <div class="chart-container">
       <!-- 故障原因表格 -->
       <div class="chart-box fault-reason-table">
-        <div class="chart-title">故障原因列表</div>
+        <div class="chart-title">
+          <span>故障原因列表</span>
+          <el-button type="success" size="mini" icon="el-icon-download" @click="exportFaultReasonData">
+            导出数据
+          </el-button>
+        </div>
 
         <!-- 故障原因筛选 -->
         <div class="fault-reason-filter">
@@ -182,6 +256,7 @@
             highlight-current-row
             :row-class-name="faultReasonRowClassName"
             :height="250"
+            @row-click="showFaultReasonDetail"
           >
             <el-table-column prop="id" label="ID" width="70" fixed="left" />
             <el-table-column prop="title" label="标题" width="120" show-overflow-tooltip />
@@ -213,6 +288,13 @@
                 <el-tag :type="getStatusTagType(scope.row.status)" size="mini">
                   {{ scope.row.status }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="70" fixed="right">
+              <template slot-scope="scope">
+                <el-button type="text" size="mini" @click.stop="showFaultReasonDetail(scope.row)">
+                  详情
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -663,6 +745,80 @@
       </span>
     </el-dialog>
 
+    <!-- 故障原因详情弹窗 -->
+    <el-dialog
+      title="故障原因详情"
+      :visible.sync="faultReasonDialogVisible"
+      width="600px"
+      top="10vh"
+      class="fault-reason-dialog"
+    >
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="工单ID">{{ faultReasonDetail.id }}</el-descriptions-item>
+        <el-descriptions-item label="工单标题">{{ faultReasonDetail.title }}</el-descriptions-item>
+        <el-descriptions-item label="故障原因">
+          <span v-if="faultReasonDetail.fault_reason && faultReasonDetail.fault_reason.trim() !== ''">
+            {{ faultReasonDetail.fault_reason }}
+          </span>
+          <span v-else style="color: #f56c6c; font-weight: bold;">未填写原因</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="片区">{{ formatArea(faultReasonDetail.belongs) }}</el-descriptions-item>
+        <el-descriptions-item label="维修人员">{{ faultReasonDetail.worker || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="工单类型">{{ faultReasonDetail.work_order_type || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="getStatusTagType(faultReasonDetail.status)" size="small">
+            {{ faultReasonDetail.status }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ faultReasonDetail.create_time }}</el-descriptions-item>
+        <el-descriptions-item label="完成时间">{{ faultReasonDetail.finish_time }}</el-descriptions-item>
+      </el-descriptions>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="faultReasonDialogVisible = false">关闭</el-button>
+      </span>
+    </el-dialog>
+
+    <!-- 维修师傅工单详情弹窗 -->
+    <el-dialog
+      :title="maintainerOrdersTitle"
+      :visible.sync="maintainerOrdersDialogVisible"
+      width="90%"
+      top="5vh"
+      class="maintainer-orders-dialog"
+    >
+      <div class="dialog-toolbar">
+        <span class="total-count">共 {{ maintainerOrdersData.length }} 条工单</span>
+      </div>
+
+      <el-table
+        v-loading="maintainerOrdersLoading"
+        :data="maintainerOrdersData"
+        style="width: 100%"
+        max-height="600"
+        stripe
+        border
+      >
+        <el-table-column prop="id" label="工单ID" width="100" />
+        <el-table-column prop="actual_maintainer" label="维修师傅" min-width="150" />
+        <el-table-column prop="title" label="工单标题" min-width="200" />
+        <el-table-column prop="status" label="状态" width="100">
+          <template slot-scope="scope">
+            <el-tag :type="getStatusTagType(scope.row.status)" size="small">
+              {{ scope.row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="work_order_type" label="工单类型" width="120" />
+        <el-table-column prop="area" label="片区" width="100" />
+        <el-table-column prop="create_time" label="创建时间" width="180" />
+        <el-table-column prop="finish_time" label="完成时间" width="180" />
+      </el-table>
+
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="maintainerOrdersDialogVisible = false">关闭</el-button>
+      </span>
+    </el-dialog>
+
     <div class="footer">
       本报告由维修工单系统自动生成 | 生成时间: {{ currentTime }}
     </div>
@@ -786,9 +942,19 @@ export default {
       cachedWorkOrders: null,
       cachedProcesses: null,
       showAllWorkers: false,
+      showAllMaintainers: false,
       showAllMaterials: false,
       tableHeight: '400px',
       workerTotalOrdersCache: {},
+      // 新增：维修师傅统计数据
+      maintainerStats: [],
+      maintainerLoading: false,
+      maintainerOrdersDialogVisible: false,
+      maintainerOrdersTitle: '',
+      maintainerOrdersLoading: false,
+      maintainerOrdersData: [],
+      currentMaintainer: '',
+      currentMaintainerType: '',
       // 新增：用于存储箱线图的数据
       typeBoxplotData: {
         categories: [],
@@ -874,7 +1040,11 @@ export default {
       principalOrdersTitle: '',
       principalOrdersLoading: false,
       principalOrdersData: [],
-      currentPrincipal: ''
+      currentPrincipal: '',
+      pieChartSelectedAreas: [],
+      pieChartAllOrdersData: [],
+      faultReasonDialogVisible: false,
+      faultReasonDetail: {}
     }
   },
   computed: {
@@ -1186,6 +1356,8 @@ export default {
 
       this.workerTotalOrdersCache = {}
       this.workerCompletionStats = {}
+      this.pieChartSelectedAreas = []
+      this.pieChartAllOrdersData = []
 
       const params = {}
 
@@ -2077,9 +2249,11 @@ export default {
       // 构建数据数组
       const regions = Object.keys(regionStats)
       const data = []
+      const countData = []
 
       failureTypes.forEach((type, typeIndex) => {
         const typeData = {}
+        const typeCountData = {}
 
         regions.forEach(region => {
           const count = regionStats[region][type] || 0
@@ -2088,20 +2262,24 @@ export default {
           // 计算频率（该类型在该地区的占比）
           const frequency = total > 0 ? (count / total * 100).toFixed(2) : 0
           typeData[region] = parseFloat(frequency)
+          typeCountData[region] = count
         })
 
         data.push(typeData)
+        countData.push(typeCountData)
       })
 
       // 更新数据
       this.regionFailureStats.regions = regions
       this.regionFailureStats.failureTypes = failureTypes
       this.regionFailureStats.data = data
+      this.regionFailureStats.countData = countData
 
       return {
         regions,
         failureTypes,
-        data
+        data,
+        countData
       }
     },
 
@@ -2202,6 +2380,7 @@ export default {
           const typeData = this.regionFailureStats.data[index]
           return typeData ? typeData[region] || 0 : 0
         }),
+        countData: this.regionFailureStats.countData[index],
         backgroundColor: colors[index % colors.length],
         borderColor: colors[index % colors.length].replace('0.7', '1'),
         borderWidth: 1
@@ -2243,10 +2422,33 @@ export default {
               display: true,
               position: 'top'
             },
+            datalabels: {
+              color: '#333',
+              font: {
+                weight: 'bold',
+                size: 10
+              },
+              formatter: function(value, context) {
+                const region = context.chart.data.labels[context.dataIndex]
+                const countData = context.dataset.countData
+                const count = countData ? countData[region] || 0 : 0
+                if (value > 0) {
+                  return `${value.toFixed(1)}%\n(${count}单)`
+                }
+                return ''
+              },
+              textAlign: 'center',
+              display: function(context) {
+                return context.dataset.data[context.dataIndex] > 0
+              }
+            },
             tooltip: {
               callbacks: {
                 label: function(context) {
-                  return `${context.dataset.label}: ${context.parsed.y}%`
+                  const region = context.chart.data.labels[context.dataIndex]
+                  const countData = context.dataset.countData
+                  const count = countData ? countData[region] || 0 : 0
+                  return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}% (${count}单)`
                 }
               }
             }
@@ -2317,6 +2519,49 @@ export default {
       this.faultReasonCurrentPage = val
     },
 
+    // 新增：显示故障原因详情弹窗
+    showFaultReasonDetail(row) {
+      this.faultReasonDetail = row
+      this.faultReasonDialogVisible = true
+    },
+
+    // 新增：导出故障原因数据
+    exportFaultReasonData() {
+      try {
+        const headers = ['工单ID', '工单标题', '故障原因', '片区', '维修人员', '工单类型', '状态', '创建时间', '完成时间']
+        const csvData = this.filteredFaultReasonData.map(item => [
+          item.id,
+          item.title,
+          item.fault_reason || '未填写原因',
+          this.formatArea(item.belongs),
+          item.worker || '-',
+          item.work_order_type || '-',
+          item.status,
+          item.create_time,
+          item.finish_time
+        ])
+
+        const csvContent = [headers, ...csvData]
+          .map(row => row.map(cell => '"' + cell + '"').join(','))
+          .join('\n')
+
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', '故障原因列表_' + this.currentTime + '.csv')
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        this.$message.success('数据导出成功')
+      } catch (error) {
+        console.error('导出数据失败:', error)
+        this.$message.error('数据导出失败')
+      }
+    },
+
     // 修改：更新所有图表数据（移除故障类型图表初始化）
     async updateAllCharts(orders) {
       // 提取故障原因数据
@@ -2324,6 +2569,9 @@ export default {
 
       // 计算地区故障频率统计数据
       this.calculateRegionFailureStats(orders)
+
+      // 计算维修师傅统计数据
+      this.calculateMaintainerStats(orders)
 
       // 只初始化地区故障频率图表
       this.$nextTick(() => {
@@ -2355,6 +2603,8 @@ export default {
 
         if (response.data.code === 200 && response.data.data && response.data.data.data) {
           const orders = response.data.data.data
+
+          this.pieChartAllOrdersData = orders
 
           // 按工单类型分组
           const typeGroups = {}
@@ -2409,6 +2659,7 @@ export default {
           // 新增：更新故障类型频率图表
           this.extractFaultReasonData(orders)
           this.calculateRegionFailureStats(orders)
+          this.calculateMaintainerStats(orders)
           this.$nextTick(() => {
             this.initRegionFailureChart()
           })
@@ -2485,6 +2736,45 @@ export default {
       console.log('工单类型统计（从工单列表数据中获取）:', this.reportData.work_order_type_stats)
 
       // 更新饼图
+      this.updateWorkTypeChart()
+    },
+
+    handlePieChartAreaChange(selectedAreas) {
+      console.log('饼图片区选择变化:', selectedAreas)
+      this.updatePieChartByAreas(selectedAreas)
+    },
+
+    updatePieChartByAreas(selectedAreas) {
+      if (!this.pieChartAllOrdersData || this.pieChartAllOrdersData.length === 0) {
+        console.warn('没有工单数据可用于饼图筛选')
+        return
+      }
+
+      let filteredOrders = this.pieChartAllOrdersData
+
+      if (selectedAreas && selectedAreas.length > 0) {
+        filteredOrders = this.pieChartAllOrdersData.filter(order => {
+          return selectedAreas.includes(order.belongs)
+        })
+      }
+
+      console.log(`筛选后的工单数量: ${filteredOrders.length} 条`)
+
+      const typeStats = {}
+      filteredOrders.forEach(order => {
+        const type = order.work_order_type || '未知类型'
+        typeStats[type] = (typeStats[type] || 0) + 1
+      })
+
+      const typeStatsArray = Object.entries(typeStats)
+        .map(([type, count]) => ({
+          type: type,
+          count: count
+        }))
+        .sort((a, b) => b.count - a.count)
+
+      this.reportData.work_order_type_stats = typeStatsArray
+
       this.updateWorkTypeChart()
     },
 
@@ -4017,6 +4307,104 @@ export default {
       this.calculateTableHeight()
     },
 
+    // 计算维修师傅统计数据
+    calculateMaintainerStats(orders) {
+      this.maintainerLoading = true
+
+      const maintainerMap = {}
+
+      orders.forEach(order => {
+        const maintainer = order.actual_maintainer
+        if (!maintainer || maintainer.trim() === '') return
+
+        // 判断是否为独立完成（只有一个人名）
+        const maintainerNames = maintainer.split(/[,，、\/\s]+/).filter(name => name.trim() !== '')
+
+        maintainerNames.forEach(name => {
+          const trimmedName = name.trim()
+          if (!trimmedName) return
+
+          if (!maintainerMap[trimmedName]) {
+            maintainerMap[trimmedName] = {
+              name: trimmedName,
+              independentOrders: [],
+              cooperativeOrders: []
+            }
+          }
+
+          // 如果只有一个人名，则是独立完成
+          if (maintainerNames.length === 1) {
+            maintainerMap[trimmedName].independentOrders.push(order)
+          } else {
+            // 多个人名，是合作完成
+            maintainerMap[trimmedName].cooperativeOrders.push(order)
+          }
+        })
+      })
+
+      // 转换为数组并计算统计数据
+      const statsArray = Object.values(maintainerMap).map(item => ({
+        name: item.name,
+        independentCount: item.independentOrders.length,
+        cooperativeCount: item.cooperativeOrders.length,
+        totalCount: item.independentOrders.length + item.cooperativeOrders.length,
+        independentOrders: item.independentOrders,
+        cooperativeOrders: item.cooperativeOrders
+      }))
+
+      // 按总完成工单数排序
+      statsArray.sort((a, b) => b.totalCount - a.totalCount)
+
+      // 添加排名
+      statsArray.forEach((item, index) => {
+        item.rank = index + 1
+      })
+
+      this.maintainerStats = statsArray
+      this.maintainerLoading = false
+
+      console.log('维修师傅统计数据:', this.maintainerStats.length, '人')
+      return statsArray
+    },
+
+    // 显示维修师傅工单详情
+    showMaintainerOrders(maintainerName, type) {
+      this.currentMaintainer = maintainerName
+      this.currentMaintainerType = type
+
+      const typeText = type === 'independent' ? '独立完成' : '合作完成'
+      this.maintainerOrdersTitle = `${maintainerName} ${typeText}的工单详情`
+      this.maintainerOrdersLoading = true
+      this.maintainerOrdersDialogVisible = true
+
+      // 从统计数据中获取对应的工单
+      const maintainerData = this.maintainerStats.find(item => item.name === maintainerName)
+
+      if (maintainerData) {
+        const orders = type === 'independent' ? maintainerData.independentOrders : maintainerData.cooperativeOrders
+
+        this.maintainerOrdersData = orders.map(order => {
+          return {
+            id: order.id || '',
+            actual_maintainer: order.actual_maintainer || '-',
+            title: order.title || '-',
+            status: this.formatStatus(order),
+            work_order_type: order.work_order_type || '-',
+            area: this.formatArea(order.belongs || order.area),
+            create_time: order.create_time || '',
+            finish_time: order.update_time || ''
+          }
+        })
+
+        this.maintainerOrdersLoading = false
+        console.log(`成功加载 ${this.maintainerOrdersData.length} 条${maintainerName}${typeText}的工单`)
+      } else {
+        this.maintainerOrdersData = []
+        this.maintainerOrdersLoading = false
+        this.$message.warning(`未找到${maintainerName}${typeText}的工单`)
+      }
+    },
+
     // 显示负责人工单详情
     showPrincipalOrders(principalName) {
       this.currentPrincipal = principalName
@@ -4346,6 +4734,30 @@ body {
   color: #374151;
   font-weight: 600;
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chart-period {
+  font-weight: 400;
+  font-size: 13px;
+  color: #6b7280;
+  margin-left: 10px;
+}
+
+.chart-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-filter .filter-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
 }
 
 .chart-wrapper {

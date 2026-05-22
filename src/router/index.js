@@ -41,33 +41,37 @@ import Layout from '@/layout'
 export const constantRoutes = [
   {
     path: '/report',
-    component: () => import('@/views/process/list/report-overview.vue'),
-    name: 'ReportOverview',
-    meta: {
-      title: '系统分析报告中心',
-      noCache: true
-    },
-    hidden: true
-  },
-  {
-    path: '/report/maintenance',
-    component: () => import('@/views/process/list/maintenance-report.vue'),
-    name: 'MaintenanceReport',
-    meta: {
-      title: '维修工单分析报告',
-      noCache: true
-    },
-    hidden: true
-  },
-  {
-    path: '/report/warehouse',
-    component: () => import('@/views/process/list/warehouse-report.vue'),
-    name: 'WarehouseReport',
-    meta: {
-      title: '仓管系统报告',
-      noCache: true
-    },
-    hidden: true
+    component: { render: h => h('router-view') },
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/process/list/report-overview.vue'),
+        name: 'ReportOverview',
+        meta: {
+          title: '系统分析报告中心',
+          noCache: true
+        }
+      },
+      {
+        path: 'maintenance',
+        component: () => import('@/views/process/list/maintenance-report.vue'),
+        name: 'MaintenanceReport',
+        meta: {
+          title: '维修工单分析报告',
+          noCache: true
+        }
+      },
+      {
+        path: 'warehouse',
+        component: () => import('@/views/process/list/warehouse-report.vue'),
+        name: 'WarehouseReport',
+        meta: {
+          title: '仓管系统报告',
+          noCache: true
+        }
+      }
+    ]
   },
   {
     path: '/redirect',

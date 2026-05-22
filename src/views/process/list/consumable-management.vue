@@ -131,6 +131,15 @@
         <div class="card-header">
           <span>材料使用列表</span>
           <div class="header-actions">
+            <!-- 筛选状态提示 -->
+            <el-tag v-if="dateRange && dateRange.length === 2" type="info" size="small" style="margin-right: 10px;">
+              <i class="el-icon-date" />
+              {{ dateRange[0].toLocaleDateString() }} 至 {{ dateRange[1].toLocaleDateString() }}
+              ({{ filteredData.length }} 条)
+            </el-tag>
+            <el-tag v-if="filterStatus" :type="getStockStatusType({onhand_stock: 1})" size="small" style="margin-right: 10px;">
+              状态: {{ filterStatus === 'sufficient' ? '使用充足' : filterStatus === 'warning' ? '使用预警' : '未使用' }}
+            </el-tag>
             <el-button
               v-if="consumableData.length > 10 && !showAllItems"
               type="text"
@@ -508,6 +517,24 @@ export default {
         data = data.filter(item => {
           const status = this.getStockStatus(item)
           return status === this.filterStatus
+        })
+      }
+
+      // 日期范围筛选（前端筛选）
+      if (this.dateRange && this.dateRange.length === 2) {
+        const startDate = new Date(this.dateRange[0])
+        startDate.setHours(0, 0, 0, 0)
+        const endDate = new Date(this.dateRange[1])
+        endDate.setHours(23, 59, 59, 999)
+
+        data = data.filter(item => {
+          if (!item.create_time && !item.update_time) return false
+
+          // 尝试解析 create_time 或 update_time
+          const itemDate = new Date(item.create_time || item.update_time)
+          if (isNaN(itemDate.getTime())) return false
+
+          return itemDate >= startDate && itemDate <= endDate
         })
       }
 
@@ -1364,56 +1391,105 @@ export default {
 
     // 时间周期统计相关方法
     handleTimePeriodChange() {
+      console.log(`时间周期已切换为: ${this.timePeriod}`)
+
+      // 重新计算时间周期消耗数据
       this.calculateTimeBasedConsumption()
+
+      // 更新图表
       this.updateCharts()
+
+      // 提示用户
+      const periodMap = {
+        'day': '按日',
+        'week': '按周',
+        'month': '按月',
+        'year': '按年'
+      }
+      this.$message.success(`已切换至${periodMap[this.timePeriod] || this.timePeriod}统计`)
     },
 
     // 处理日期范围变化
     handleDateRangeChange() {
       this.pagination.page = 1
-      this.loadConsumableData()
+      this.showAllItems = false
+
+      // 重新计算时间周期统计
+      this.calculateTimeBasedConsumption()
+      this.updateCharts()
+
+      // 提示用户筛选结果
+      if (this.dateRange && this.dateRange.length === 2) {
+        const startDate = this.dateRange[0].toLocaleDateString()
+        const endDate = this.dateRange[1].toLocaleDateString()
+        console.log(`已选择日期范围: ${startDate} 至 ${endDate}`)
+      }
     },
 
     // 计算时间周期消耗
     calculateTimeBasedConsumption() {
       const consumption = {}
 
-      this.consumableData.forEach(item => {
-        if (!item.create_time) return
+      // 根据日期范围筛选数据，如果没有选择日期范围则使用全部数据
+      let dataToProcess = this.consumableData
+      if (this.dateRange && this.dateRange.length === 2) {
+        const startDate = new Date(this.dateRange[0])
+        startDate.setHours(0, 0, 0, 0)
+        const endDate = new Date(this.dateRange[1])
+        endDate.setHours(23, 59, 59, 999)
 
-        const date = new Date(item.create_time)
+        dataToProcess = this.consumableData.filter(item => {
+          if (!item.create_time && !item.update_time) return false
+          const itemDate = new Date(item.create_time || item.update_time)
+          if (isNaN(itemDate.getTime())) return false
+          return itemDate >= startDate && itemDate <= endDate
+        })
+      }
+
+      dataToProcess.forEach(item => {
+        if (!item.create_time && !item.update_time) return
+
+        const date = new Date(item.create_time || item.update_time)
+        if (isNaN(date.getTime())) return
+
         let key
 
         switch (this.timePeriod) {
-          case 'day': { // 加 {
+          case 'day': {
             key = date.toISOString().split('T')[0]
             break
-          } // 加 }
-          case 'week': { // 这里加 {  👇 修复点
+          }
+          case 'week': {
             const weekStart = new Date(date)
             weekStart.setDate(date.getDate() - date.getDay())
             key = weekStart.toISOString().split('T')[0]
             break
-          } // 这里加 }
-          case 'month': { // 加 {
+          }
+          case 'month': {
             key = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0')
             break
-          } // 加 }
-          case 'year': { // 加 {
+          }
+          case 'year': {
             key = date.getFullYear().toString()
             break
-          } // 加 }
+          }
+          default: {
+            key = date.toISOString().split('T')[0]
+          }
         }
+
         if (!consumption[key]) {
           consumption[key] = 0
         }
         consumption[key] += item.onhand_stock || 1
       })
 
-      // 转换为数组格式
+      // 转换为数组格式并排序
       this.timeBasedConsumption = Object.entries(consumption)
         .map(([period, count]) => ({ period, count }))
         .sort((a, b) => a.period.localeCompare(b.period))
+
+      console.log(`时间周期统计完成 (${this.timePeriod}):`, this.timeBasedConsumption.length, '个数据点')
     },
 
     // 工具方法

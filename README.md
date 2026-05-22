@@ -164,3 +164,6 @@ nvm list 列出所有版本
 nvm use 14.21.3 切换到14.21.3版本
 node -v 查看node版本
 yarn run dev 启动项目
+
+git bash 一键启动
+NODE_OPTIONS=--openssl-legacy-provider yarn run dev

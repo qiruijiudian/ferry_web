@@ -191,7 +191,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="角色" style="width: 90%">
-              <el-select v-model="form.roleId" placeholder="请选择" style="width: 100%" @change="$forceUpdate()">
+              <el-select v-model="form.roleIds" multiple placeholder="请选择角色" style="width: 100%" @change="$forceUpdate()">
                 <el-option
                   v-for="item in roleOptions"
                   :key="item.roleId"
@@ -455,7 +455,7 @@ export default {
         status: '0',
         remark: undefined,
         postIds: undefined,
-        roleIds: undefined
+        roleIds: []
       }
       this.resetForm('form')
     },
@@ -499,7 +499,7 @@ export default {
         this.postOptions = response.posts
         this.roleOptions = response.roles
         this.form.postIds = response.postIds[0]
-        this.form.roleIds = response.roleIds[0]
+        this.form.roleIds = response.roleIds // 直接使用完整的 roleIds 数组
         this.open = true
         this.title = '修改用户'
         this.form.password = ''

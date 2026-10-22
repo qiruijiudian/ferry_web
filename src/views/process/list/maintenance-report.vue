@@ -60,10 +60,14 @@
         @click="handleKpiClick(index)"
       >
         <div class="kpi-label">{{ kpi.label }}</div>
-        <div v-if="index !== 6" :class="['kpi-value', getKpiValueClass(index)]">{{ kpi.value }}</div>
-        <div v-else class="kpi-worker-value">
+        <div v-if="index !== 6 && index !== 7" :class="['kpi-value', getKpiValueClass(index)]">{{ kpi.value }}</div>
+        <div v-else-if="index === 6" class="kpi-worker-value">
           <div class="worker-name">{{ kpi.worker }}</div>
           <div class="worker-count">{{ kpi.count }}个工单</div>
+        </div>
+        <div v-else class="kpi-fault-value">
+          <div class="fault-name">{{ topFaultStat.name }}</div>
+          <div class="fault-count">重复 {{ topFaultStat.count }} 次</div>
         </div>
         <div :class="['trend', kpi.trend]">
           <i :class="kpi.icon" /> {{ kpi.description }}
@@ -399,6 +403,177 @@
       </div>
     </div>
 
+    <!-- 新增：工单耗材情况看板 -->
+    <div class="full-width-section consumable-section">
+      <div class="section-header">
+        <h3 class="section-title">工单耗材情况</h3>
+        <div class="section-actions consumable-actions">
+          <el-tag v-if="consumableLoaded" size="small" :type="consumableWindowTruncated ? 'warning' : 'info'" effect="plain">
+            {{ getAreaText(filters.area) }} · 已统计 {{ consumableTotalOrders }}/{{ consumablePeriodTotal }} 条工单
+          </el-tag>
+          <el-date-picker
+            v-model="consumableDateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="yyyy-MM-dd"
+            format="yyyy-MM-dd"
+            :picker-options="pickerOptions"
+            :clearable="false"
+            size="small"
+            class="consumable-date-picker"
+            @change="handleConsumableDateChange"
+          />
+          <el-button type="primary" size="small" icon="el-icon-refresh" :loading="consumableLoading" @click="refreshConsumableData">
+            刷新
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 耗材 KPI 指标 -->
+      <div class="consumable-kpi-row">
+        <div class="consumable-kpi-card">
+          <div class="kpi-label">耗材总耗量</div>
+          <div class="consumable-kpi-value">{{ consumableSummary.totalQty }}<span class="consumable-kpi-unit">件</span></div>
+          <div class="consumable-kpi-desc">{{ consumableSummary.ordersWith }} 个工单使用过耗材</div>
+        </div>
+        <div class="consumable-kpi-card">
+          <div class="kpi-label">材料种类</div>
+          <div class="consumable-kpi-value">{{ consumableSummary.distinct }}<span class="consumable-kpi-unit">种</span></div>
+          <div class="consumable-kpi-desc">当前周期内出现过的材料</div>
+        </div>
+        <div class="consumable-kpi-card">
+          <div class="kpi-label">耗材填写率</div>
+          <div class="consumable-kpi-value" :class="consumableSummary.fillRateNum >= 20 ? 'rate-good' : 'rate-warn'">{{ consumableSummary.fillRate }}<span class="consumable-kpi-unit">%</span></div>
+          <div class="consumable-kpi-desc">{{ consumableSummary.ordersWith }} / {{ consumableSummary.totalOrders }} 个工单已填写</div>
+        </div>
+        <div class="consumable-kpi-card">
+          <div class="kpi-label">最常用材料</div>
+          <div class="consumable-kpi-material">{{ consumableSummary.topName }}</div>
+          <div class="consumable-kpi-desc">累计耗用 {{ consumableSummary.topQty }} 件</div>
+        </div>
+        <div class="consumable-kpi-card">
+          <div class="kpi-label">耗材最多地区</div>
+          <div class="consumable-kpi-material consumable-kpi-area">{{ consumableSummary.topArea }}</div>
+          <div class="consumable-kpi-desc">累计耗用 {{ consumableSummary.topAreaQty }} 件</div>
+        </div>
+      </div>
+
+      <!-- 首次加载中 -->
+      <div v-if="!consumableLoaded && !consumableFetchError" v-loading="true" element-loading-text="正在加载耗材数据..." class="consumable-loading-box" />
+
+      <!-- 数据拉取失败（长周期易超时） -->
+      <el-alert
+        v-else-if="consumableFetchError"
+        type="error"
+        show-icon
+        :closable="false"
+        title="本次耗材数据加载失败"
+      >
+        <template slot="description">
+          所选时间范围（{{ consumablePeriodText }}）内工单量较大，单次拉取超时，上方 KPI 为最近一次成功统计的结果。可点击“刷新”重试，或通过右上方日期选择器缩短时间范围后重试。
+        </template>
+      </el-alert>
+
+      <!-- 周期内无工单数据 -->
+      <el-alert
+        v-else-if="consumableSummary.totalOrders === 0"
+        title="当前时间范围内没有工单数据"
+        :description="'所选时间范围（' + consumablePeriodText + '）内没有查询到工单，请通过右上方日期选择器调整时间范围后重试。'"
+        type="info"
+        show-icon
+        :closable="false"
+      />
+
+      <!-- 周期内无耗材消耗提示 -->
+      <el-alert
+        v-else-if="consumableSummary.ordersWith === 0"
+        type="warning"
+        show-icon
+        :closable="false"
+        title="当前周期内无耗材消耗记录"
+      >
+        <template slot="description">
+          所选周期（{{ consumablePeriodText }} · {{ getAreaText(filters.area) }}）内已统计 {{ consumableSummary.totalOrders }} 条工单，均未填写耗材。耗材由维修师傅在处理工单时填写；历史耗材记录集中在 2025年10月～2026年4月，可通过右上方日期选择器选择该时间段查看。
+          <span v-if="consumableWindowTruncated">（注：当前周期工单较多，仅统计了最近 {{ consumableTotalOrders }} 条，更早的工单未纳入本次统计）</span>
+        </template>
+      </el-alert>
+
+      <template v-else>
+        <!-- 材料耗用 TOP10 柱状图 -->
+        <div v-loading="consumableLoading" class="chart-box consumable-chart-box">
+          <div class="chart-title">
+            <span>材料耗用 TOP10</span>
+            <span class="chart-period">{{ consumablePeriodText }}</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas ref="consumableChart" />
+          </div>
+        </div>
+
+        <!-- 耗材明细表 -->
+        <div v-loading="consumableLoading" class="consumable-table-wrap">
+          <div class="dialog-toolbar">
+            <span class="total-count">共 {{ filteredConsumableItems.length }} 条耗材记录</span>
+            <div class="toolbar-actions">
+              <el-input
+                v-model="consumableSearch"
+                placeholder="搜索材料名称、工单、师傅..."
+                prefix-icon="el-icon-search"
+                style="width: 240px;"
+                clearable
+                size="small"
+                @input="handleConsumableSearch"
+              />
+              <el-button type="success" size="small" icon="el-icon-download" @click="exportConsumableData">
+                导出数据
+              </el-button>
+            </div>
+          </div>
+          <el-table
+            :data="paginatedConsumableItems"
+            style="width: 100%"
+            size="small"
+            stripe
+            border
+            :height="300"
+          >
+            <el-table-column prop="orderId" label="工单ID" width="80" fixed="left" />
+            <el-table-column label="日期" width="100">
+              <template slot-scope="scope">{{ (scope.row.create_time || '').slice(5, 16) }}</template>
+            </el-table-column>
+            <el-table-column prop="area" label="片区" width="70" />
+            <el-table-column prop="type" label="类型" width="70" />
+            <el-table-column prop="material" label="材料名称" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="count" label="数量" width="60" align="center" />
+            <el-table-column label="来源" width="70" align="center">
+              <template slot-scope="scope">
+                <el-tag :type="scope.row.source === '库存' ? '' : 'warning'" size="mini">
+                  {{ scope.row.source }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="maintainer" label="维修师傅" width="110" show-overflow-tooltip />
+            <el-table-column prop="title" label="工单标题" min-width="150" show-overflow-tooltip />
+          </el-table>
+          <div v-if="filteredConsumableItems.length > 0" class="table-pagination consumable-table-pagination">
+            <span class="total-count">共 {{ filteredConsumableItems.length }} 条记录</span>
+            <el-pagination
+              :current-page="consumableCurrentPage"
+              :page-sizes="[10, 20, 50, 100]"
+              :page-size="consumablePageSize"
+              :total="filteredConsumableItems.length"
+              layout="sizes, prev, pager, next"
+              small
+              @size-change="handleConsumableSizeChange"
+              @current-change="handleConsumableCurrentChange"
+            />
+          </div>
+        </div>
+      </template>
+    </div>
+
     <!-- 工单详情对话框 -->
     <el-dialog
       :title="workOrderDialogTitle"
@@ -589,6 +764,15 @@
           </template>
         </el-table-column>
 
+        <el-table-column prop="solution" label="处理方法" min-width="200" show-overflow-tooltip>
+          <template slot-scope="scope">
+            <span v-if="scope.row.solution && scope.row.solution.trim() !== ''">
+              {{ scope.row.solution }}
+            </span>
+            <span v-else style="color: #909399; font-style: italic;">未填写</span>
+          </template>
+        </el-table-column>
+
         <!-- 将创建时间和完成时间移到最右边 -->
         <el-table-column prop="create_time" label="创建时间" width="180" sortable="custom" />
         <el-table-column prop="finish_time" label="完成时间" width="180" sortable="custom" />
@@ -700,6 +884,108 @@
       </div>
       <span slot="footer" class="dialog-footer">
         <el-button @click="durationDialogVisible = false">关闭</el-button>
+      </span>
+    </el-dialog>
+
+    <!-- 常见故障类型统计弹窗 -->
+    <el-dialog
+      title="常见故障类型统计"
+      :visible.sync="faultStatsDialogVisible"
+      width="90%"
+      top="5vh"
+      class="fault-stats-dialog"
+    >
+      <div class="fault-stats-toolbar">
+        <span class="total-count">
+          共 {{ faultStatsList.length }} 种故障原因 · 已填写故障 {{ faultTotalCount }} 条 / 窗口内工单 {{ faultReasonData.length }} 条（{{ getReportPeriodText }} · {{ getAreaText(filters.area) }}）
+        </span>
+        <el-input
+          v-model="faultStatsSearch"
+          placeholder="搜索故障类型..."
+          prefix-icon="el-icon-search"
+          style="width: 220px;"
+          clearable
+          size="small"
+        />
+      </div>
+
+      <el-table
+        :data="filteredFaultStats"
+        style="width: 100%"
+        max-height="260"
+        size="small"
+        stripe
+        border
+        highlight-current-row
+        @row-click="handleFaultStatsRowClick"
+      >
+        <el-table-column prop="rank" label="排名" width="55" align="center" />
+        <el-table-column prop="type" label="故障类型" width="80" align="center">
+          <template slot-scope="scope">
+            <el-tag :type="getFaultTypeTagType(scope.row.type)" size="small">{{ scope.row.type }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="故障原因" min-width="200" show-overflow-tooltip />
+        <el-table-column label="所属区域" min-width="150" show-overflow-tooltip>
+          <template slot-scope="scope">{{ formatFaultAreas(scope.row) }}</template>
+        </el-table-column>
+        <el-table-column prop="count" label="重复次数" width="85" align="center">
+          <template slot-scope="scope">
+            <span class="clickable">{{ scope.row.count }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="占比" width="80" align="center">
+          <template slot-scope="scope">
+            {{ faultTotalCount > 0 ? ((scope.row.count / faultTotalCount) * 100).toFixed(1) : 0 }}%
+          </template>
+        </el-table-column>
+        <el-table-column prop="latest" label="最近发生" width="160">
+          <template slot-scope="scope">{{ (scope.row.latest || '-').slice(0, 16) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="90" align="center">
+          <template slot-scope="scope">
+            <el-button type="text" size="mini" @click.stop="handleFaultStatsRowClick(scope.row)">
+              工单明细
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="fault-detail-header">
+        <template v-if="faultStatsSelected">
+          「{{ faultStatsSelected.type }} · {{ faultStatsSelected.name }}」的关联工单（{{ faultStatsOrders.length }} 条）
+        </template>
+        <template v-else>
+          点击上方任意故障类型，查看对应工单明细
+        </template>
+      </div>
+
+      <el-table
+        :data="faultStatsOrders"
+        style="width: 100%"
+        max-height="300"
+        size="small"
+        stripe
+        border
+      >
+        <el-table-column prop="id" label="工单ID" width="80" />
+        <el-table-column prop="title" label="工单标题" min-width="180" show-overflow-tooltip />
+        <el-table-column label="片区" width="70">
+          <template slot-scope="scope">{{ formatArea(scope.row.belongs) }}</template>
+        </el-table-column>
+        <el-table-column prop="work_order_type" label="类型" width="70" />
+        <el-table-column prop="worker" label="维修人员" width="100" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="80">
+          <template slot-scope="scope">
+            <el-tag :type="getStatusTagType(scope.row.status)" size="mini">{{ scope.row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="create_time" label="创建时间" width="150" />
+        <el-table-column prop="finish_time" label="完成时间" width="150" />
+      </el-table>
+
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="faultStatsDialogVisible = false">关闭</el-button>
       </span>
     </el-dialog>
 
@@ -881,7 +1167,8 @@ export default {
         { label: '返修工单数量', value: '0', trend: '', icon: '', description: '' },
         { label: '平均完成时长', value: '0小时', trend: '', icon: '', description: '' },
         { label: '一次性修复率', value: '0%', trend: '', icon: '', description: '' },
-        { label: '负责人排行', value: '', worker: '', count: 0, trend: '', icon: '', description: '' }
+        { label: '负责人排行', value: '', worker: '', count: 0, trend: '', icon: '', description: '' },
+        { label: '常见故障', value: '', trend: '', icon: '', description: '点击查看类型排行与工单明细' }
       ],
       workerData: [],
       workerLoading: false,
@@ -1044,7 +1331,24 @@ export default {
       pieChartSelectedAreas: [],
       pieChartAllOrdersData: [],
       faultReasonDialogVisible: false,
-      faultReasonDetail: {}
+      faultReasonDetail: {},
+      // 新增：工单耗材看板相关数据
+      consumableDateRange: [],
+      consumableItems: [],
+      consumableTotalOrders: 0,
+      consumablePeriodTotal: 0,
+      consumableOrdersWith: 0,
+      consumableLoading: false,
+      consumableLoaded: false,
+      consumableFetchError: false,
+      consumableLastFetchOk: false,
+      consumableSearch: '',
+      consumableCurrentPage: 1,
+      consumablePageSize: 10,
+      // 新增：常见故障统计弹窗相关数据
+      faultStatsDialogVisible: false,
+      faultStatsSelected: null,
+      faultStatsSearch: ''
     }
   },
   computed: {
@@ -1307,10 +1611,172 @@ export default {
       const start = (this.faultReasonCurrentPage - 1) * this.faultReasonPageSize
       const end = start + this.faultReasonPageSize
       return this.filteredFaultReasonData.slice(start, end)
+    },
+
+    // 新增：耗材看板汇总指标
+    consumableSummary() {
+      const items = this.consumableItems
+      let totalQty = 0
+      const nameQty = {}
+      items.forEach(item => {
+        totalQty += item.count || 0
+        nameQty[item.material] = (nameQty[item.material] || 0) + (item.count || 0)
+      })
+      let topName = '-'
+      let topQty = 0
+      Object.keys(nameQty).forEach(name => {
+        if (nameQty[name] > topQty) {
+          topQty = nameQty[name]
+          topName = name
+        }
+      })
+      const totalOrders = this.consumableTotalOrders
+      const ordersWith = this.consumableOrdersWith
+      const fillRateNum = totalOrders > 0 ? (ordersWith / totalOrders) * 100 : 0
+      // 耗材最多地区（按耗用件数聚合）
+      const areaQty = {}
+      items.forEach(item => {
+        areaQty[item.area] = (areaQty[item.area] || 0) + (item.count || 0)
+      })
+      let topArea = '-'
+      let topAreaQty = 0
+      Object.keys(areaQty).forEach(area => {
+        if (areaQty[area] > topAreaQty) {
+          topAreaQty = areaQty[area]
+          topArea = area
+        }
+      })
+      return {
+        totalQty: totalQty,
+        distinct: Object.keys(nameQty).length,
+        fillRate: fillRateNum.toFixed(1),
+        fillRateNum: fillRateNum,
+        topName: topName,
+        topQty: topQty,
+        topArea: topArea,
+        topAreaQty: topAreaQty,
+        ordersWith: ordersWith,
+        totalOrders: totalOrders
+      }
+    },
+
+    // 新增：耗材看板当前周期文本
+    consumablePeriodText() {
+      if (this.consumableDateRange && this.consumableDateRange.length === 2) {
+        return `${this.consumableDateRange[0]} 至 ${this.consumableDateRange[1]}`
+      }
+      return '最近一周'
+    },
+
+    // 新增：耗材统计窗口是否被截断（周期内工单数超过单次拉取量）
+    consumableWindowTruncated() {
+      return this.consumablePeriodTotal > this.consumableTotalOrders && this.consumableTotalOrders > 0
+    },
+
+    // 新增：材料耗用TOP10（按件数）
+    consumableTop10() {
+      const nameQty = {}
+      this.consumableItems.forEach(item => {
+        nameQty[item.material] = (nameQty[item.material] || 0) + (item.count || 0)
+      })
+      return Object.keys(nameQty)
+        .map(name => ({ name: name, qty: nameQty[name] }))
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 10)
+    },
+
+    // 新增：搜索过滤后的耗材明细
+    filteredConsumableItems() {
+      let data = this.consumableItems
+      if (this.consumableSearch.trim()) {
+        const search = this.consumableSearch.trim().toLowerCase()
+        data = data.filter(item => {
+          return (
+            (item.material && item.material.toLowerCase().includes(search)) ||
+            (item.title && item.title.toLowerCase().includes(search)) ||
+            (item.maintainer && item.maintainer.toLowerCase().includes(search)) ||
+            (item.type && item.type.toLowerCase().includes(search)) ||
+            (item.area && item.area.toLowerCase().includes(search)) ||
+            (item.orderId && item.orderId.toString().toLowerCase().includes(search))
+          )
+        })
+      }
+      return data
+    },
+
+    // 新增：分页后的耗材明细
+    paginatedConsumableItems() {
+      const start = (this.consumableCurrentPage - 1) * this.consumablePageSize
+      const end = start + this.consumablePageSize
+      return this.filteredConsumableItems.slice(start, end)
+    },
+
+    // 新增：常见故障统计（按故障类型×故障原因聚合，含区域分布与关联工单）
+    faultStatsList() {
+      const groups = {}
+      this.faultReasonData.forEach(item => {
+        const reason = this.normalizeFaultReason(item.fault_reason)
+        if (!reason) return
+        const type = item.work_order_type || '未知'
+        const key = type + '|' + reason
+        if (!groups[key]) {
+          groups[key] = { type: type, name: reason, count: 0, orders: [], latest: '', areaCounts: { }}
+        }
+        const area = item.belongs ? this.formatArea(item.belongs) : '未填写'
+        groups[key].areaCounts[area] = (groups[key].areaCounts[area] || 0) + 1
+        groups[key].count++
+        groups[key].orders.push(item)
+        if (item.create_time && item.create_time > groups[key].latest) {
+          groups[key].latest = item.create_time
+        }
+      })
+      return Object.values(groups).sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count
+        return b.latest > a.latest ? 1 : (b.latest < a.latest ? -1 : 0)
+      })
+    },
+
+    // 新增：已填写故障原因的总条数（占比分母）
+    faultTotalCount() {
+      return this.faultStatsList.reduce((sum, s) => sum + s.count, 0)
+    },
+
+    // 新增：最常见故障（KPI卡片展示）
+    topFaultStat() {
+      if (this.faultStatsList.length === 0) {
+        return { name: '暂无故障记录', count: 0 }
+      }
+      const top = this.faultStatsList[0]
+      return { name: top.name, count: top.count }
+    },
+
+    // 新增：搜索过滤后的故障统计（保留全量排名，可搜故障原因/类型/区域）
+    filteredFaultStats() {
+      const ranked = this.faultStatsList.map((s, i) => Object.assign({}, s, { rank: i + 1 }))
+      if (!this.faultStatsSearch.trim()) return ranked
+      const search = this.faultStatsSearch.trim().toLowerCase()
+      return ranked.filter(s => {
+        return (
+          s.name.toLowerCase().includes(search) ||
+          s.type.toLowerCase().includes(search) ||
+          this.formatFaultAreas(s).toLowerCase().includes(search)
+        )
+      })
+    },
+
+    // 新增：选中故障的关联工单
+    faultStatsOrders() {
+      if (!this.faultStatsSelected) return []
+      return this.faultStatsSelected.orders || []
     }
   },
   mounted() {
     console.log('MaintenanceReport组件已挂载')
+    // 新增：初始化耗材看板独立周期为最近一周，并拉取数据
+    const nowDate = new Date()
+    const weekAgo = new Date(nowDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+    this.consumableDateRange = [this.formatDate(weekAgo).slice(0, 10), this.formatDate(nowDate).slice(0, 10)]
+    this.fetchConsumableData()
     this.preFetchAndCacheData()
     this.fetchReportData()
     this.loadChartJS().then(() => {
@@ -1410,6 +1876,8 @@ export default {
       await this.fetchFilteredData(params)
       // 新增：更新超时工单数据
       await this.fetchTimeoutOrders()
+      // 新增：顶部片区筛选变化时，刷新耗材看板（周期仍用看板自己的日期范围）
+      this.fetchConsumableData()
     },
     async fetchFilteredData(params) {
       try {
@@ -2528,11 +2996,12 @@ export default {
     // 新增：导出故障原因数据
     exportFaultReasonData() {
       try {
-        const headers = ['工单ID', '工单标题', '故障原因', '片区', '维修人员', '工单类型', '状态', '创建时间', '完成时间']
+        const headers = ['工单ID', '工单标题', '故障原因', '处理方法', '片区', '维修人员', '工单类型', '状态', '创建时间', '完成时间']
         const csvData = this.filteredFaultReasonData.map(item => [
           item.id,
           item.title,
           item.fault_reason || '未填写原因',
+          item.solution || '未填写',
           this.formatArea(item.belongs),
           item.worker || '-',
           item.work_order_type || '-',
@@ -3254,14 +3723,14 @@ export default {
         worker: item.actual_maintainer || '未分配',
         status: this.formatStatus(item),
         completion_time: this.calculateCompletionTime(item) || '未完成',
-        // 新增列：分配耗时和操作耗时
         allocation_time: timeStats.allocationTime,
         operation_time: timeStats.operationTime,
         create_time: item.create_time || '',
         finish_time: item.is_end ? item.update_time : '未完成',
         area: this.formatArea(item.belongs || item.area),
         work_order_type: item.work_order_type || '-',
-        fault_reason: item.fault_reason || ''
+        fault_reason: item.fault_reason || '',
+        solution: item.solution || ''
       }
     },
 
@@ -3703,6 +4172,11 @@ export default {
         case 6:
           this.scrollToWorkerTable()
           return
+        case 7:
+          this.faultStatsSelected = null
+          this.faultStatsSearch = ''
+          this.faultStatsDialogVisible = true
+          return
         default:
           return
       }
@@ -3865,6 +4339,8 @@ export default {
         return 'kpi-card-blue'
       } else if (index === 6) {
         return 'kpi-card-orange'
+      } else if (index === 7) {
+        return 'kpi-card-purple'
       }
       return ''
     },
@@ -3899,7 +4375,7 @@ export default {
     exportWorkOrderData() {
       this.exportLoading = true
       try {
-        const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '分配耗时', '操作耗时', '片区', '工单类型', '故障原因', '创建时间', '完成时间']
+        const headers = ['工单ID', '工单标题', '维修人员', '状态', '完成时长', '分配耗时', '操作耗时', '片区', '工单类型', '故障原因', '处理方法', '创建时间', '完成时间']
         const csvData = this.filteredWorkOrderData.map(item => [
           item.id,
           item.title,
@@ -3911,6 +4387,7 @@ export default {
           item.area,
           item.work_order_type,
           item.fault_reason || '未填写原因',
+          item.solution || '未填写',
           item.create_time,
           item.finish_time
         ])
@@ -4471,6 +4948,334 @@ export default {
         this.$message.error('获取负责人工单失败')
         this.principalOrdersData = []
       })
+    },
+
+    // ===== 新增：工单耗材看板相关方法 =====
+
+    // 解析actual_consumables字段（兼容库存goods_desc与手填name两种格式）
+    parseConsumablesString(str) {
+      const items = []
+      try {
+        let text = String(str).trim()
+        if (text.startsWith('[')) {
+          text = text.slice(1)
+        }
+        if (text.endsWith(']')) {
+          text = text.slice(0, -1)
+        }
+        const mapRegex = /map\[(.*?)\](?=\s*map\[|\s*$)/g
+        let match
+        while ((match = mapRegex.exec(text)) !== null) {
+          const content = match[1]
+          const countMatch = content.match(/count:(\d+)/)
+          const descMatch = content.match(/goods_desc:(.+?)(?=\s+\w+:|$)/)
+          const nameMatch = content.match(/name:(.+?)\s*$/)
+          const sortMatch = content.match(/goods_sort:(\S+)/)
+          const idMatch = content.match(/id:(\S+)/)
+          let name = null
+          if (descMatch) {
+            name = descMatch[1].trim()
+          } else if (nameMatch) {
+            name = nameMatch[1].trim()
+          }
+          if (name) {
+            name = name.replace(/[，,]+$/, '').trim()
+            const sort = sortMatch ? sortMatch[1] : null
+            const gid = idMatch ? idMatch[1] : null
+            // 来源判断：带库存分类编码且ID为数字的是库存项，其余视为手填项
+            let source = '库存'
+            if (sort === 'REMARK' || !sort || (gid && !/^\d+$/.test(gid))) {
+              source = '手填'
+            }
+            items.push({
+              name: name,
+              count: countMatch ? parseInt(countMatch[1], 10) : 1,
+              sort: sort,
+              gid: gid,
+              source: source
+            })
+          }
+        }
+      } catch (error) {
+        console.error('解析耗材数据失败:', error)
+      }
+      return items
+    },
+
+    // 从工单列表提取耗材数据（复用页面已拉取的工单列表，与现有筛选联动）
+    processConsumableData(orders) {
+      const items = []
+      let ordersWith = 0
+      orders.forEach(order => {
+        const ac = order.actual_consumables
+        if (ac && String(ac).trim() !== '' && String(ac).trim() !== '[]') {
+          const consumables = this.parseConsumablesString(ac)
+          if (consumables.length > 0) {
+            ordersWith++
+            consumables.forEach(c => {
+              items.push({
+                orderId: order.id,
+                title: order.title || '-',
+                create_time: order.create_time || '',
+                area: order.belongs ? this.formatArea(order.belongs) : '未填写',
+                type: order.work_order_type || '-',
+                maintainer: order.actual_maintainer || order.principals || '-',
+                material: c.name,
+                count: c.count,
+                source: c.source
+              })
+            })
+          }
+        }
+      })
+      this.consumableItems = items
+      this.consumableTotalOrders = orders.length
+      this.consumableOrdersWith = ordersWith
+      this.consumableLoaded = true
+      this.consumableCurrentPage = 1
+      // 周期内无耗材时销毁旧图表实例，避免残留
+      if (ordersWith === 0 && this.chartJsInstances.consumableChart) {
+        this.chartJsInstances.consumableChart.destroy()
+        this.chartJsInstances.consumableChart = null
+      }
+      this.$nextTick(() => {
+        this.initOrUpdateConsumableChart()
+      })
+    },
+
+    // 初始化/更新耗材TOP10横向柱状图
+    initOrUpdateConsumableChart() {
+      const chartRef = this.$refs.consumableChart
+      if (!chartRef) {
+        return
+      }
+      if (!window.Chart) {
+        // Chart.js尚未加载完成时延迟重试
+        this._consumableChartRetries = (this._consumableChartRetries || 0) + 1
+        if (this._consumableChartRetries <= 6 && !this._isDestroyed) {
+          setTimeout(() => {
+            this.initOrUpdateConsumableChart()
+          }, 800)
+        }
+        return
+      }
+      this._consumableChartRetries = 0
+      if (this.chartJsInstances.consumableChart) {
+        this.chartJsInstances.consumableChart.destroy()
+        this.chartJsInstances.consumableChart = null
+      }
+      if (this.consumableTop10.length === 0) {
+        return
+      }
+      // 横向柱状图：倒序排列使耗用最多的材料显示在最上方
+      const top10 = this.consumableTop10.slice().reverse()
+      this.chartJsInstances.consumableChart = new window.Chart(chartRef.getContext('2d'), {
+        type: 'horizontalBar',
+        data: {
+          labels: top10.map(item => item.name),
+          datasets: [{
+            label: '耗用件数',
+            data: top10.map(item => item.qty),
+            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+            borderColor: 'rgb(37, 99, 235)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          legend: {
+            display: false
+          },
+          scales: {
+            xAxes: [{
+              ticks: {
+                beginAtZero: true
+              }
+            }],
+            yAxes: [{
+              gridLines: {
+                display: false
+              }
+            }]
+          },
+          tooltips: {
+            callbacks: {
+              label: function(tooltipItem, data) {
+                return `耗用 ${data.datasets[0].data[tooltipItem.index]} 件`
+              }
+            }
+          }
+        }
+      })
+    },
+
+    // 刷新耗材数据（重新拉取当前筛选条件下的工单列表）
+    refreshConsumableData() {
+      this.fetchConsumableData().finally(() => {
+        if (this.consumableLastFetchOk) {
+          this.$message.success('耗材数据已刷新')
+        } else {
+          this.$message.error('刷新耗材数据失败，请稍后重试或缩短时间范围')
+        }
+      })
+    },
+
+    // 耗材看板独立周期变化
+    handleConsumableDateChange() {
+      this.fetchConsumableData()
+    },
+
+    // 获取耗材看板的时间范围参数（独立于页面顶部时长筛选）
+    getConsumableDateParams() {
+      if (this.consumableDateRange && this.consumableDateRange.length === 2) {
+        return {
+          startTime: this.consumableDateRange[0] + ' 00:00:00',
+          endTime: this.consumableDateRange[1] + ' 23:59:59'
+        }
+      }
+      // 兑底：最近一周
+      const now = new Date()
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      return {
+        startTime: this.formatDate(start),
+        endTime: this.formatDate(now)
+      }
+    },
+
+    // 拉取耗材看板数据（周期独立，片区跟随顶部筛选联动）
+    async fetchConsumableData() {
+      this.consumableLoading = true
+      this.consumableLastFetchOk = false
+      this.consumableFetchError = false
+      try {
+        const dateParams = this.getConsumableDateParams()
+        const params = {
+          classify: 4,
+          page: 1,
+          per_page: 500,
+          startTime: dateParams.startTime,
+          endTime: dateParams.endTime
+        }
+        // 片区与页面顶部筛选联动
+        if (this.filters.area !== 'all') {
+          const areaMap = {
+            'gangba': 'kamba',
+            'lasa': 'lhasa',
+            'cuona': 'cona',
+            'sajia': 'sayga'
+          }
+          params.belongs = areaMap[this.filters.area]
+        }
+        const response = await axios({
+          url: 'https://order.cdqrmi.com/api/v1/analysis/list',
+          method: 'get',
+          params: params,
+          timeout: 60000,
+          headers: {
+            'Authorization': 'Bearer ' + this.getToken()
+          }
+        })
+        if (response.data.code === 200 && response.data.data && response.data.data.data) {
+          const orders = response.data.data.data
+          this.processConsumableData(orders)
+          this.consumablePeriodTotal = response.data.data.total_count || orders.length
+          this.consumableLastFetchOk = true
+        } else {
+          this.consumableFetchError = true
+          this.$message.error('获取耗材数据失败: ' + (response.data.message || '未知错误'))
+        }
+      } catch (error) {
+        console.error('获取耗材数据失败:', error)
+        this.consumableFetchError = true
+      } finally {
+        this.consumableLoading = false
+      }
+    },
+
+    // 耗材明细搜索
+    handleConsumableSearch() {
+      this.consumableCurrentPage = 1
+    },
+
+    // 耗材明细分页大小变化
+    handleConsumableSizeChange(val) {
+      this.consumablePageSize = val
+      this.consumableCurrentPage = 1
+    },
+
+    // 耗材明细当前页变化
+    handleConsumableCurrentChange(val) {
+      this.consumableCurrentPage = val
+    },
+
+    // 导出耗材明细CSV
+    exportConsumableData() {
+      try {
+        const headers = ['工单ID', '日期', '片区', '工单类型', '材料名称', '数量', '来源', '维修师傅', '工单标题']
+        const csvData = this.filteredConsumableItems.map(item => [
+          item.orderId,
+          item.create_time,
+          item.area,
+          item.type,
+          item.material,
+          item.count,
+          item.source,
+          item.maintainer,
+          item.title
+        ])
+        const escapeCell = (cell) => '"' + String(cell === null || cell === undefined ? '' : cell).replace(/"/g, '""') + '"'
+        const csvContent = [headers, ...csvData]
+          .map(row => row.map(escapeCell).join(','))
+          .join('\n')
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        link.setAttribute('href', url)
+        link.setAttribute('download', '工单耗材明细_' + this.currentTime + '.csv')
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        this.$message.success('数据导出成功')
+      } catch (error) {
+        console.error('导出耗材数据失败:', error)
+        this.$message.error('数据导出失败')
+      }
+    },
+
+    // ===== 新增：常见故障统计相关方法 =====
+
+    // 故障原因归一化（去首尾空白、折叠内部空白、去尾部标点），用于聚合统计
+    normalizeFaultReason(str) {
+      if (!str) return ''
+      return String(str).trim().replace(/\s+/g, ' ').replace(/[。，,、；;！!\.]+$/, '')
+    },
+
+    // 点击故障统计行，展示该故障的关联工单
+    handleFaultStatsRowClick(row) {
+      this.faultStatsSelected = row
+    },
+
+    // 故障类型标签颜色（与工单类型分布饼图配色一致：供暖红/供水蓝/供氧绿）
+    getFaultTypeTagType(type) {
+      const map = {
+        '供暖': 'danger',
+        '供水': '',
+        '供氧': 'success',
+        '维保': 'info'
+      }
+      return map[type] !== undefined ? map[type] : 'info'
+    },
+
+    // 格式化故障所属区域分布（如“萨迦(2)、错那(1)”，未填写片区的工单计入“未填写”）
+    formatFaultAreas(entry) {
+      if (!entry || !entry.areaCounts) return '-'
+      const parts = Object.keys(entry.areaCounts)
+        .map(area => ({ area: area, count: entry.areaCounts[area] }))
+        .sort((a, b) => b.count - a.count)
+        .map(item => `${item.area}(${item.count})`)
+      return parts.length > 0 ? parts.join('、') : '-'
     }
   }
 
@@ -5153,5 +5958,143 @@ body {
 .principal-orders-dialog .el-table th {
   background-color: #f5f7fa;
   font-weight: 600;
+}
+
+/* 新增：工单耗材看板样式 */
+.consumable-section {
+  border-top: 2px solid #3b82f6;
+}
+
+.consumable-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.consumable-date-picker {
+  width: 260px;
+}
+
+.consumable-kpi-material.consumable-kpi-area {
+  color: #0e7490;
+}
+
+/* 新增：常见故障KPI卡片（紫色） */
+.kpi-card-purple {
+  background: #f3e8ff;
+}
+
+.kpi-card-purple .kpi-label,
+.kpi-card-purple .fault-count {
+  color: #6b21a8;
+}
+
+.kpi-fault-value .fault-name {
+  font-size: 19px;
+  font-weight: 700;
+  color: #7e22ce;
+  margin: 6px 0 2px;
+  line-height: 1.35;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.kpi-fault-value .fault-count {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 常见故障统计弹窗 */
+.fault-stats-dialog .fault-stats-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fault-stats-dialog .fault-detail-header {
+  margin: 15px 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.fault-stats-dialog .el-table__row {
+  cursor: pointer;
+}
+
+.consumable-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.consumable-kpi-card {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 15px 12px;
+  text-align: center;
+}
+
+.consumable-kpi-value {
+  font-size: 30px;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin: 6px 0 4px;
+}
+
+.consumable-kpi-unit {
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: 3px;
+  color: #64748b;
+}
+
+.consumable-kpi-value.rate-good {
+  color: #16a34a;
+}
+
+.consumable-kpi-value.rate-warn {
+  color: #d97706;
+}
+
+.consumable-kpi-material {
+  font-size: 19px;
+  font-weight: 700;
+  color: #b45309;
+  margin: 12px 0 4px;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.consumable-kpi-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.consumable-loading-box {
+  height: 120px;
+}
+
+.consumable-chart-box {
+  margin-bottom: 20px;
+  background: #fbfdff;
+}
+
+.consumable-table-wrap {
+  border-top: 1px solid #eaeaea;
+  padding-top: 15px;
+}
+
+.consumable-table-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
 }
 </style>
